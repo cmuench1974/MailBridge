@@ -4,6 +4,9 @@ using MailBridge.App.Localization;
 using MailBridge.App.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Windows.Foundation;
 using Windows.Graphics;
 
 namespace MailBridge.App.Views;
@@ -50,6 +53,14 @@ public sealed partial class SelectionWindow : Window
         CancelButton.Content = Strings.Get("common.cancel");
         OkButton.Content = Strings.Get("common.ok");
         ReloadButton.Visibility = reload is null ? Visibility.Collapsed : Visibility.Visible;
+
+        // WinUI wheel workaround: intercept wheel events at the root, even
+        // when an inner ScrollViewer marks them handled, and scroll manually.
+        if (Content is FrameworkElement root)
+        {
+            root.AddHandler(UIElement.PointerWheelChangedEvent,
+                new PointerEventHandler(Root_PointerWheel), handledEventsToo: true);
+        }
 
         TakeSnapshot();
         HookFolders();
@@ -210,4 +221,69 @@ public sealed partial class SelectionWindow : Window
     }
 
     private void RefreshSummary() => SummaryText.Text = _buildSummary();
+
+    private void Root_PointerWheel(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is not UIElement root)
+        {
+            return;
+        }
+
+        var point = e.GetCurrentPoint(root);
+        if (point.Properties.IsHorizontalMouseWheel)
+        {
+            return;
+        }
+
+        var target = ContainsPointer(FolderList, point.Position) ? FolderList
+            : ContainsPointer(MessageList, point.Position) ? MessageList
+            : null;
+        if (target is null)
+        {
+            return;
+        }
+
+        var scrollViewer = FindDescendant<ScrollViewer>(target);
+        if (scrollViewer is null)
+        {
+            return;
+        }
+
+        var offset = scrollViewer.VerticalOffset - point.Properties.MouseWheelDelta;
+        scrollViewer.ChangeView(null, (float)offset, null, disableAnimation: false);
+        e.Handled = true;
+    }
+
+    private bool ContainsPointer(FrameworkElement element, Point position)
+    {
+        if (Content is not UIElement root)
+        {
+            return false;
+        }
+
+        var bounds = element.TransformToVisual(root)
+            .TransformBounds(new Rect(new Point(0, 0), new Size(element.ActualWidth, element.ActualHeight)));
+        return bounds.Contains(position);
+    }
+
+    private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match)
+            {
+                return match;
+            }
+
+            var nested = FindDescendant<T>(child);
+            if (nested is not null)
+            {
+                return nested;
+            }
+        }
+
+        return null;
+    }
 }
