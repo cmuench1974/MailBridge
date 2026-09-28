@@ -1,0 +1,32 @@
+<Page
+    x:Class="MailBridge.App.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ScrollViewer>
+        <StackPanel Padding="24" Spacing="16" MaxWidth="600" HorizontalAlignment="Left">
+            <TextBlock Text="Settings" Style="{StaticResource TitleTextBlockStyle}" />
+            <TextBlock Text="Defaults for new backups and the app appearance. Saved values pre-fill the Backup and Schedule pages; the theme applies immediately."
+                       TextWrapping="Wrap" Opacity="0.7" />
+
+            <ComboBox Header="Theme" ItemsSource="{x:Bind ViewModel.ThemeOptions}"
+                      SelectedItem="{x:Bind ViewModel.SelectedTheme, Mode=TwoWay}" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBox Header="Default backup destination folder" Width="400"
+                         Text="{x:Bind ViewModel.DefaultBackupDirectory, Mode=TwoWay}" />
+                <Button Content="Browse..." Click="BrowseButton_Click" VerticalAlignment="Bottom" />
+            </StackPanel>
+
+            <CheckBox Content="Compress backups into a single .zip file by default"
+                      IsChecked="{x:Bind ViewModel.DefaultCompressToZip, Mode=TwoWay}" />
+
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Content="Save settings" Command="{x:Bind ViewModel.SaveCommand}" Style="{StaticResource AccentButtonStyle}" />
+                <Button Content="Open data folder" Click="OpenDataFolderButton_Click" />
+            </StackPanel>
+
+            <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" TextWrapping="Wrap" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

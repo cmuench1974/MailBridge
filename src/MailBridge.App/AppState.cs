@@ -7,12 +7,12 @@ namespace MailBridge.App;
 
 /// <summary>
 /// Minimal shared-instance holder so state created on one page (accounts,
-/// schedules) is visible from every other page. A proper DI container can
-/// replace this once the app grows further.
+/// schedules, settings) is visible from every other page. A proper DI
+/// container can replace this once the app grows further.
 /// </summary>
 public static class AppState
 {
-    private static readonly string DataDirectory =
+    public static string DataDirectory { get; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MailBridge");
 
     private static readonly WindowsCredentialStore CredentialStore = new();
@@ -24,16 +24,20 @@ public static class AppState
 
     public static ScheduleStore ScheduleStore { get; } = new(Path.Combine(DataDirectory, "schedules.json"));
 
+    public static SettingsStore SettingsStoreInstance { get; } = new(Path.Combine(DataDirectory, "settings.json"));
+
     public static WindowsTaskSchedulerService TaskSchedulerService { get; } = new();
 
     public static ScheduledBackupRunner ScheduledBackupRunner { get; } =
         new(AccountStore, ScheduleStore, CredentialStore, BackupServiceInstance, CompressionServiceInstance);
 
-    public static AccountsViewModel Accounts { get; } = new(CredentialStore, AccountStore);
+    public static SettingsViewModel Settings { get; } = new(SettingsStoreInstance);
 
-    public static BackupViewModel Backup { get; } = new(BackupServiceInstance, CompressionServiceInstance, CredentialStore);
+    public static AccountsViewModel Accounts { get; } = new(CredentialStore, AccountStore, ImapConnectionService);
+
+    public static BackupViewModel Backup { get; } = new(BackupServiceInstance, CompressionServiceInstance, CredentialStore, SettingsStoreInstance);
 
     public static RestoreViewModel Restore { get; } = new(new RestoreService(ImapConnectionService), CompressionServiceInstance, CredentialStore);
 
-    public static SchedulesViewModel Schedules { get; } = new(ScheduleStore, TaskSchedulerService, Accounts.Accounts);
+    public static SchedulesViewModel Schedules { get; } = new(ScheduleStore, TaskSchedulerService, Accounts.Accounts, SettingsStoreInstance);
 }

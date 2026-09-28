@@ -34,4 +34,27 @@ public static class JsonFileStore
         var json = JsonSerializer.Serialize(items, Options);
         File.WriteAllText(path, json);
     }
+
+    public static T LoadItem<T>(string path) where T : new()
+    {
+        if (!File.Exists(path))
+        {
+            return new T();
+        }
+
+        var json = File.ReadAllText(path);
+        return JsonSerializer.Deserialize<T>(json, Options) ?? new T();
+    }
+
+    public static void SaveItem<T>(string path, T item)
+    {
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var json = JsonSerializer.Serialize(item, Options);
+        File.WriteAllText(path, json);
+    }
 }

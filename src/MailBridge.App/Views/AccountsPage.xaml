@@ -17,9 +17,14 @@
 
             <StackPanel Orientation="Horizontal" Spacing="12">
                 <Button Content="{x:Bind ViewModel.FormTitle, Mode=OneWay}" Command="{x:Bind ViewModel.SaveAccountCommand}" Style="{StaticResource AccentButtonStyle}" />
+                <Button Content="Test connection" Command="{x:Bind ViewModel.TestConnectionCommand}" VerticalAlignment="Bottom" />
+                <ProgressRing IsActive="{x:Bind ViewModel.TestConnectionCommand.IsRunning, Mode=OneWay}"
+                              Visibility="{x:Bind ToVisibility(ViewModel.TestConnectionCommand.IsRunning), Mode=OneWay}"
+                              Width="28" Height="28" VerticalAlignment="Center" />
                 <Button Content="Cancel" Command="{x:Bind ViewModel.CancelEditCommand}"
                         Visibility="{x:Bind ToVisibility(ViewModel.IsEditing), Mode=OneWay}" />
             </StackPanel>
+            <TextBlock Text="{x:Bind ViewModel.ConnectionStatus, Mode=OneWay}" TextWrapping="Wrap" />
             <TextBlock Text="Leave the password empty to keep the stored password."
                        TextWrapping="Wrap" Opacity="0.7"
                        Visibility="{x:Bind ToVisibility(ViewModel.IsEditing), Mode=OneWay}" />

@@ -11,6 +11,7 @@ public partial class AccountsViewModel : ObservableObject
 {
     private readonly ICredentialStore _credentialStore;
     private readonly AccountStore _accountStore;
+    private readonly ImapConnectionService _imapConnectionService;
 
     public ObservableCollection<EmailAccount> Accounts { get; } = new();
 
@@ -30,6 +31,9 @@ public partial class AccountsViewModel : ObservableObject
     private string password = string.Empty;
 
     [ObservableProperty]
+    private string connectionStatus = string.Empty;
+
+    [ObservableProperty]
     private Guid? editingAccountId;
 
     public bool IsEditing => EditingAccountId is not null;
@@ -42,10 +46,11 @@ public partial class AccountsViewModel : ObservableObject
         OnPropertyChanged(nameof(FormTitle));
     }
 
-    public AccountsViewModel(ICredentialStore credentialStore, AccountStore accountStore)
+    public AccountsViewModel(ICredentialStore credentialStore, AccountStore accountStore, ImapConnectionService imapConnectionService)
     {
         _credentialStore = credentialStore;
         _accountStore = accountStore;
+        _imapConnectionService = imapConnectionService;
 
         foreach (var account in _accountStore.Load())
         {
@@ -99,6 +104,49 @@ public partial class AccountsViewModel : ObservableObject
 
     [RelayCommand]
     private void CancelEdit() => ResetForm();
+
+    [RelayCommand]
+    private async Task TestConnectionAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Host) || string.IsNullOrWhiteSpace(Username))
+        {
+            ConnectionStatus = "Enter IMAP host and username first.";
+            return;
+        }
+
+        var password = Password;
+        if (string.IsNullOrEmpty(password) && EditingAccountId is { } editingId)
+        {
+            var existing = Accounts.FirstOrDefault(a => a.Id == editingId);
+            password = existing is null ? null : _credentialStore.TryGet(existing.CredentialKey, existing.Username);
+        }
+
+        if (string.IsNullOrEmpty(password))
+        {
+            ConnectionStatus = "No password available: type the (app) password to test a new account.";
+            return;
+        }
+
+        var testAccount = new EmailAccount
+        {
+            Host = Host,
+            Port = Port,
+            Username = Username,
+            UseSsl = true,
+        };
+
+        ConnectionStatus = $"Connecting to {Host}:{Port}...";
+        try
+        {
+            using var client = await _imapConnectionService.ConnectAsync(testAccount, password);
+            var folders = await _imapConnectionService.GetAllFoldersAsync(client);
+            ConnectionStatus = $"Connection OK - authenticated as {Username}, {folders.Count} folder(s) found.";
+        }
+        catch (Exception ex)
+        {
+            ConnectionStatus = $"Connection failed: {ex.Message}";
+        }
+    }
 
     private void UpdateAccount(Guid id)
     {

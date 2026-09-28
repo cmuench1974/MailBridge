@@ -30,11 +30,18 @@ public partial class BackupViewModel : ObservableObject
     [ObservableProperty]
     private bool isRunning;
 
-    public BackupViewModel(BackupService backupService, CompressionService compressionService, ICredentialStore credentialStore)
+    public BackupViewModel(BackupService backupService, CompressionService compressionService, ICredentialStore credentialStore, SettingsStore settingsStore)
     {
         _backupService = backupService;
         _compressionService = compressionService;
         _credentialStore = credentialStore;
+
+        var settings = settingsStore.Load();
+        if (!string.IsNullOrWhiteSpace(settings.DefaultBackupDirectory))
+        {
+            DestinationDirectory = settings.DefaultBackupDirectory;
+        }
+        CompressToZip = settings.DefaultCompressToZip;
     }
 
     [RelayCommand]

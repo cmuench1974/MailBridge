@@ -41,11 +41,18 @@ public partial class SchedulesViewModel : ObservableObject
     [ObservableProperty]
     private string statusText = string.Empty;
 
-    public SchedulesViewModel(ScheduleStore scheduleStore, WindowsTaskSchedulerService taskSchedulerService, ObservableCollection<EmailAccount> accounts)
+    public SchedulesViewModel(ScheduleStore scheduleStore, WindowsTaskSchedulerService taskSchedulerService, ObservableCollection<EmailAccount> accounts, SettingsStore settingsStore)
     {
         _scheduleStore = scheduleStore;
         _taskSchedulerService = taskSchedulerService;
         Accounts = accounts;
+
+        var settings = settingsStore.Load();
+        if (!string.IsNullOrWhiteSpace(settings.DefaultBackupDirectory))
+        {
+            DestinationDirectory = settings.DefaultBackupDirectory;
+        }
+        CompressToZip = settings.DefaultCompressToZip;
 
         foreach (var schedule in _scheduleStore.Load())
         {

@@ -4,9 +4,10 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <Grid>
-        <NavigationView x:Name="RootNavigationView"
+            <NavigationView x:Name="RootNavigationView"
                         PaneDisplayMode="Left"
                         IsBackButtonVisible="Collapsed"
+                        IsSettingsVisible="False"
                         SelectionChanged="RootNavigationView_SelectionChanged"
                         Loaded="RootNavigationView_Loaded">
             <NavigationView.MenuItems>
@@ -31,6 +32,14 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
+
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem Content="Settings" Tag="settings">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE713;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.FooterMenuItems>
 
             <Frame x:Name="ContentFrame" />
         </NavigationView>
