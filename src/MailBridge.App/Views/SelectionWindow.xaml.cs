@@ -9,7 +9,9 @@ using Windows.Graphics;
 namespace MailBridge.App.Views;
 
 /// <summary>
-/// Picker window for backup/restore selection. Edits the shared
+/// Picker window for backup/restore selection. Opens immediately; if no
+/// folders are loaded yet it runs the owner's reload action itself (with
+/// its own progress ring and status line). Edits the shared
 /// SelectableFolder items in place, so the owning view model's
 /// BuildSelection() and SelectionSummary see every change immediately.
 /// Cancel restores the state captured when the window was opened.
@@ -20,6 +22,7 @@ public sealed partial class SelectionWindow : Window
     private readonly Func<SelectableFolder, Task>? _loadFolderMessages;
     private readonly Func<Task>? _reload;
     private readonly Func<string> _buildSummary;
+    private readonly Func<string>? _statusProvider;
     private readonly Dictionary<INotifyPropertyChanged, PropertyChangedEventHandler> _subscriptions = new();
     private readonly List<(SelectableFolder Folder, bool? FolderState, List<(SelectableMessage Message, bool State)> Messages)> _snapshot = new();
     private bool _accepted;
@@ -29,7 +32,8 @@ public sealed partial class SelectionWindow : Window
         ObservableCollection<SelectableFolder> folders,
         Func<SelectableFolder, Task>? loadFolderMessages,
         Func<Task>? reload,
-        Func<string> buildSummary)
+        Func<string> buildSummary,
+        Func<string>? statusProvider = null)
     {
         InitializeComponent();
         Title = title;
@@ -39,6 +43,7 @@ public sealed partial class SelectionWindow : Window
         _loadFolderMessages = loadFolderMessages;
         _reload = reload;
         _buildSummary = buildSummary;
+        _statusProvider = statusProvider;
 
         FolderList.ItemsSource = _folders;
         ReloadButton.Content = Strings.Get("common.reload");
@@ -49,6 +54,11 @@ public sealed partial class SelectionWindow : Window
         TakeSnapshot();
         HookFolders();
         RefreshSummary();
+
+        if (_folders.Count == 0 && _reload is not null)
+        {
+            _ = ReloadAsync();
+        }
 
         Closed += (_, _) =>
         {
@@ -93,7 +103,9 @@ public sealed partial class SelectionWindow : Window
         }
     }
 
-    private async void ReloadButton_Click(object sender, RoutedEventArgs e)
+    private async void ReloadButton_Click(object sender, RoutedEventArgs e) => await ReloadAsync();
+
+    private async Task ReloadAsync()
     {
         if (_reload is null)
         {
@@ -108,7 +120,9 @@ public sealed partial class SelectionWindow : Window
             MessageList.ItemsSource = null;
             await _reload();
             HookFolders();
-            RefreshSummary();
+            SummaryText.Text = _folders.Count > 0
+                ? _buildSummary()
+                : _statusProvider?.Invoke() ?? _buildSummary();
         }
         finally
         {

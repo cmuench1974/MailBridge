@@ -41,39 +41,37 @@ public sealed partial class RestorePage : Page
         }
     }
 
-    private async void SelectContentsButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private void SelectContentsButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
+        if (string.IsNullOrWhiteSpace(ViewModel.BackupPath))
+        {
+            _ = ShowInfoDialogAsync(Localization.Strings.Get("restore.selectFirst"));
+            return;
+        }
+
         var button = (Button)sender;
         button.IsEnabled = false;
-        var opened = false;
-        try
-        {
-            if (ViewModel.BackupFolders.Count == 0)
-            {
-                await ViewModel.LoadContentsCommand.ExecuteAsync(null);
-                if (ViewModel.BackupFolders.Count == 0)
-                {
-                    return;
-                }
-            }
 
-            var window = new SelectionWindow(
-                Localization.Strings.Get("restore.selTitle"),
-                ViewModel.BackupFolders,
-                null,
-                () => ViewModel.LoadContentsCommand.ExecuteAsync(null),
-                () => ViewModel.SelectionSummary);
-            window.Closed += (_, _) => button.IsEnabled = true;
-            window.Activate();
-            opened = true;
-        }
-        finally
+        var window = new SelectionWindow(
+            Localization.Strings.Get("restore.selTitle"),
+            ViewModel.BackupFolders,
+            null,
+            () => ViewModel.LoadContentsCommand.ExecuteAsync(null),
+            () => ViewModel.SelectionSummary,
+            () => ViewModel.StatusText);
+        window.Closed += (_, _) => button.IsEnabled = true;
+        window.Activate();
+    }
+
+    private async Task ShowInfoDialogAsync(string message)
+    {
+        var dialog = new ContentDialog
         {
-            if (!opened)
-            {
-                button.IsEnabled = true;
-            }
-        }
+            XamlRoot = XamlRoot,
+            Content = message,
+            CloseButtonText = Localization.Strings.Get("common.ok"),
+        };
+        await dialog.ShowAsync();
     }
 
     private Visibility ToVisibility(bool value) =>
