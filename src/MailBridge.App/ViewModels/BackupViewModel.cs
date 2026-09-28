@@ -49,19 +49,19 @@ public partial class BackupViewModel : ObservableObject
     {
         if (SelectedAccount is null || string.IsNullOrWhiteSpace(DestinationDirectory))
         {
-            StatusText = "Select an account and destination folder first.";
+            StatusText = Localization.Strings.Get("common.selectFirst");
             return;
         }
 
         var password = _credentialStore.TryGet(SelectedAccount.CredentialKey, SelectedAccount.Username);
         if (password is null)
         {
-            StatusText = "No stored password for this account - re-add it with a password.";
+            StatusText = Localization.Strings.Get("common.noPassword");
             return;
         }
 
         IsRunning = true;
-        StatusText = "Connecting...";
+        StatusText = Localization.Strings.Get("backup.connecting");
         ProgressValue = 0;
 
         try
@@ -82,16 +82,16 @@ public partial class BackupViewModel : ObservableObject
                 var zipPath = Path.Combine(DestinationDirectory, $"{SelectedAccount.Username}_{DateTime.Now:yyyyMMdd_HHmmss}.zip");
                 _compressionService.CompressDirectory(workDir, zipPath);
                 Directory.Delete(workDir, recursive: true);
-                StatusText = $"Backup complete: {manifest.TotalMessages} messages -> {zipPath}";
+                StatusText = Localization.Strings.Get("backup.completeZip", manifest.TotalMessages, zipPath);
             }
             else
             {
-                StatusText = $"Backup complete: {manifest.TotalMessages} messages in {DestinationDirectory}";
+                StatusText = Localization.Strings.Get("backup.completeDir", manifest.TotalMessages, DestinationDirectory);
             }
         }
         catch (Exception ex)
         {
-            StatusText = $"Backup failed: {ex.Message}";
+            StatusText = Localization.Strings.Get("backup.failed", ex.Message);
         }
         finally
         {

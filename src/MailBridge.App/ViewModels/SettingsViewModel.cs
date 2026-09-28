@@ -10,6 +10,13 @@ public partial class SettingsViewModel : ObservableObject
 
     public IReadOnlyList<string> ThemeOptions { get; } = new[] { "System", "Light", "Dark" };
 
+    public IReadOnlyList<string> LanguageOptions { get; } = new[] { "English", "Deutsch" };
+
+    [ObservableProperty]
+    private string selectedLanguage = "English";
+
+    public string SelectedLanguageCode => Localization.Strings.DisplayNameToCode(SelectedLanguage);
+
     [ObservableProperty]
     private string selectedTheme = "System";
 
@@ -27,6 +34,7 @@ public partial class SettingsViewModel : ObservableObject
         _settingsStore = settingsStore;
 
         var settings = _settingsStore.Load();
+        SelectedLanguage = Localization.Strings.LanguageDisplayName(settings.Language);
         SelectedTheme = settings.Theme;
         DefaultBackupDirectory = settings.DefaultBackupDirectory;
         DefaultCompressToZip = settings.DefaultCompressToZip;
@@ -37,11 +45,12 @@ public partial class SettingsViewModel : ObservableObject
     {
         _settingsStore.Save(new Core.Models.AppSettings
         {
+            Language = SelectedLanguageCode,
             Theme = SelectedTheme,
             DefaultBackupDirectory = DefaultBackupDirectory,
             DefaultCompressToZip = DefaultCompressToZip,
         });
 
-        StatusText = "Settings saved.";
+        StatusText = Localization.Strings.Get("settings.saved");
     }
 }

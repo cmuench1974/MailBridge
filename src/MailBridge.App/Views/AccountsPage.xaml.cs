@@ -1,3 +1,4 @@
+using MailBridge.App.Localization;
 using MailBridge.App.ViewModels;
 using MailBridge.Core.Models;
 using Microsoft.UI.Xaml;
@@ -7,10 +8,14 @@ namespace MailBridge.App.Views;
 
 public sealed partial class AccountsPage : Page
 {
+    public string L(string key) => Localization.Strings.Get(key);
     public AccountsViewModel ViewModel => AppState.Accounts;
 
     public AccountsPage()
     {
+        Resources["EditLabel"] = Strings.Get("accounts.edit");
+        Resources["RemoveLabel"] = Strings.Get("accounts.remove");
+
         InitializeComponent();
     }
 
@@ -32,11 +37,12 @@ public sealed partial class AccountsPage : Page
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
-            Title = "Remove account?",
-            Content = $"Remove '{account.DisplayName}' ({account.Username} on {account.Host})? "
-                      + "Its stored password will be deleted and any scheduled backup for it will no longer run.",
-            PrimaryButtonText = "Remove",
-            CloseButtonText = "Cancel",
+            Title = Strings.Get("accounts.removeTitle"),
+            Content = Strings.Get(
+                "accounts.removeBody",
+                account.DisplayName, account.Username, account.Host),
+            PrimaryButtonText = Strings.Get("accounts.remove"),
+            CloseButtonText = Strings.Get("common.cancel"),
             DefaultButton = ContentDialogButton.Close,
         };
 

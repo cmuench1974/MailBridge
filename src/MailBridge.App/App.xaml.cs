@@ -1,3 +1,4 @@
+using MailBridge.App.Localization;
 using Microsoft.UI.Xaml;
 
 namespace MailBridge.App;
@@ -10,7 +11,33 @@ public partial class App : Application
 
     public App()
     {
-        InitializeComponent();
+        try
+        {
+            InitializeComponent();
+            Strings.SetLanguage(AppState.Settings.SelectedLanguageCode);
+
+            this.UnhandledException += (s, e) =>
+            {
+                try
+                {
+                    File.WriteAllText(
+                        Path.Combine(Path.GetTempPath(), "mailbridge-crash.log"),
+                        e.Message + "\n\n" + e.Exception);
+                }
+                catch { }
+            };
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                File.WriteAllText(
+                    Path.Combine(Path.GetTempPath(), "mailbridge-ctor.log"),
+                    ex.ToString());
+            }
+            catch { }
+            throw;
+        }
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)

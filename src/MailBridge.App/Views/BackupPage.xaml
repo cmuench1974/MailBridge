@@ -1,25 +1,26 @@
 <Page
+
     x:Class="MailBridge.App.Views.BackupPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <StackPanel Padding="24" Spacing="16" MaxWidth="560" HorizontalAlignment="Center" VerticalAlignment="Center">
-        <TextBlock Text="Backup" Style="{StaticResource TitleTextBlockStyle}" />
-        <TextBlock Text="Downloads every folder and message from the selected account."
+        <TextBlock Text="{x:Bind L('backup.title')}" Style="{StaticResource TitleTextBlockStyle}" />
+        <TextBlock Text="{x:Bind L('backup.intro')}"
                    TextWrapping="Wrap" Opacity="0.7" />
 
-        <ComboBox Header="Source account" ItemsSource="{x:Bind Accounts}"
+        <ComboBox Header="{x:Bind L('backup.sourceAccount')}" ItemsSource="{x:Bind Accounts}"
                   SelectedItem="{x:Bind ViewModel.SelectedAccount, Mode=TwoWay}"
                   DisplayMemberPath="DisplayName" />
 
         <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBox Header="Destination folder" Width="400" Text="{x:Bind ViewModel.DestinationDirectory, Mode=TwoWay}" />
-            <Button Content="Browse..." Click="BrowseButton_Click" VerticalAlignment="Bottom" />
+            <TextBox Header="{x:Bind L('backup.destination')}" Width="400" Text="{x:Bind ViewModel.DestinationDirectory, Mode=TwoWay}" />
+            <Button Content="{x:Bind L('common.browse')}" Click="BrowseButton_Click" VerticalAlignment="Bottom" />
         </StackPanel>
 
-        <CheckBox Content="Compress into a single .zip file" IsChecked="{x:Bind ViewModel.CompressToZip, Mode=TwoWay}" />
+        <CheckBox Content="{x:Bind L('common.compress')}" IsChecked="{x:Bind ViewModel.CompressToZip, Mode=TwoWay}" />
 
-        <Button Content="Start backup" Command="{x:Bind ViewModel.RunBackupCommand}"
+        <Button Content="{x:Bind L('backup.start')}" Command="{x:Bind ViewModel.RunBackupCommand}"
                 Style="{StaticResource AccentButtonStyle}" />
 
         <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsRunning, Mode=OneWay}" Visibility="{x:Bind ViewModel.IsRunning, Mode=OneWay}" />

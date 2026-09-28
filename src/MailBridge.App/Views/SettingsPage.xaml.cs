@@ -9,6 +9,7 @@ namespace MailBridge.App.Views;
 
 public sealed partial class SettingsPage : Page
 {
+    public string L(string key) => Localization.Strings.Get(key);
     public SettingsViewModel ViewModel => AppState.Settings;
 
     public SettingsPage()

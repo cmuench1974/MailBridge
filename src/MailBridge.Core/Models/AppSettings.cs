@@ -7,6 +7,9 @@ namespace MailBridge.Core.Models;
 /// </summary>
 public sealed class AppSettings
 {
+    /// <summary>UI language code: "en" or "de".</summary>
+    public string Language { get; set; } = "en";
+
     /// <summary>App color scheme: "System", "Light" or "Dark".</summary>
     public string Theme { get; set; } = "System";
 

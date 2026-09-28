@@ -65,7 +65,7 @@ public partial class SchedulesViewModel : ObservableObject
     {
         if (SelectedAccount is null || string.IsNullOrWhiteSpace(DestinationDirectory))
         {
-            StatusText = "Select an account and destination folder first.";
+            StatusText = Localization.Strings.Get("common.selectFirst");
             return;
         }
 
@@ -86,12 +86,12 @@ public partial class SchedulesViewModel : ObservableObject
             _taskSchedulerService.RegisterOrUpdate(schedule);
             _scheduleStore.Upsert(schedule);
             Schedules.Add(schedule);
-            StatusText = $"Schedule created for {schedule.AccountDisplayName}.";
+            StatusText = Localization.Strings.Get("schedule.created", schedule.AccountDisplayName);
             DestinationDirectory = string.Empty;
         }
         catch (Exception ex)
         {
-            StatusText = $"Could not create schedule: {ex.Message}";
+            StatusText = Localization.Strings.Get("schedule.createFailed", ex.Message);
         }
     }
 
@@ -103,11 +103,13 @@ public partial class SchedulesViewModel : ObservableObject
         {
             _taskSchedulerService.RegisterOrUpdate(schedule);
             _scheduleStore.Upsert(schedule);
-            StatusText = schedule.Enabled ? "Schedule enabled." : "Schedule disabled.";
+            StatusText = schedule.Enabled
+                ? Localization.Strings.Get("schedule.enabledMsg")
+                : Localization.Strings.Get("schedule.disabledMsg");
         }
         catch (Exception ex)
         {
-            StatusText = $"Could not update schedule: {ex.Message}";
+            StatusText = Localization.Strings.Get("schedule.updateFailed", ex.Message);
         }
     }
 
@@ -117,6 +119,6 @@ public partial class SchedulesViewModel : ObservableObject
         _taskSchedulerService.Remove(schedule.Id);
         _scheduleStore.Remove(schedule.Id);
         Schedules.Remove(schedule);
-        StatusText = "Schedule removed.";
+        StatusText = Localization.Strings.Get("schedule.removed");
     }
 }

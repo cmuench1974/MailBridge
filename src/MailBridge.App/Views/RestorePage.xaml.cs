@@ -10,6 +10,7 @@ namespace MailBridge.App.Views;
 
 public sealed partial class RestorePage : Page
 {
+    public string L(string key) => Localization.Strings.Get(key);
     public RestoreViewModel ViewModel => AppState.Restore;
 
     public ObservableCollection<EmailAccount> Accounts => AppState.Accounts.Accounts;

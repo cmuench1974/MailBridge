@@ -31,7 +31,7 @@ public partial class RestoreViewModel : ObservableObject
     private DateTimeOffset? dateTo;
 
     [ObservableProperty]
-    private string statusText = "Ready.";
+    private string statusText = Localization.Strings.Get("restore.ready");
 
     [ObservableProperty]
     private bool isRunning;
@@ -55,19 +55,19 @@ public partial class RestoreViewModel : ObservableObject
     {
         if (TargetAccount is null || string.IsNullOrWhiteSpace(BackupPath))
         {
-            StatusText = "Select a backup and a target account first.";
+            StatusText = Localization.Strings.Get("restore.selectFirst");
             return;
         }
 
         var password = _credentialStore.TryGet(TargetAccount.CredentialKey, TargetAccount.Username);
         if (password is null)
         {
-            StatusText = "No stored password for this account - re-add it with a password.";
+            StatusText = Localization.Strings.Get("common.noPassword");
             return;
         }
 
         IsRunning = true;
-        StatusText = "Preparing backup...";
+        StatusText = Localization.Strings.Get("restore.preparing");
 
         string? extractedTempDir = null;
 
@@ -85,7 +85,7 @@ public partial class RestoreViewModel : ObservableObject
                 DateTo = DateTo,
             };
 
-            StatusText = "Restoring...";
+            StatusText = Localization.Strings.Get("restore.restoring");
 
             var outcome = await _restoreService.RunRestoreAsync(
                 workingDir,
@@ -95,12 +95,12 @@ public partial class RestoreViewModel : ObservableObject
                 conflict => ConflictHandler?.Invoke(conflict) ?? Task.FromResult(ConflictResolution.Skip));
 
             StatusText = outcome.Aborted
-                ? $"Aborted. Restored: {outcome.Restored}, Replaced: {outcome.Replaced}, Skipped: {outcome.Skipped}"
-                : $"Done. Restored: {outcome.Restored}, Replaced: {outcome.Replaced}, Skipped: {outcome.Skipped}";
+                ? Localization.Strings.Get("restore.aborted", outcome.Restored, outcome.Replaced, outcome.Skipped)
+                : Localization.Strings.Get("restore.done", outcome.Restored, outcome.Replaced, outcome.Skipped);
         }
         catch (Exception ex)
         {
-            StatusText = $"Restore failed: {ex.Message}";
+            StatusText = Localization.Strings.Get("restore.failed", ex.Message);
         }
         finally
         {

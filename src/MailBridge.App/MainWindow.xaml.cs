@@ -1,3 +1,4 @@
+using MailBridge.App.Localization;
 using MailBridge.App.ViewModels;
 using MailBridge.App.Views;
 using Microsoft.UI.Windowing;
@@ -10,6 +11,8 @@ public sealed partial class MainWindow : Window
 {
     private const int DefaultWidth = 1180;
     private const int DefaultHeight = 780;
+
+    public string L(string key) => Strings.Get(key);
 
     public MainWindow()
     {

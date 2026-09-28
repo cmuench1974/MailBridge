@@ -9,6 +9,7 @@ namespace MailBridge.App.Views;
 
 public sealed partial class BackupPage : Page
 {
+    public string L(string key) => Localization.Strings.Get(key);
     public BackupViewModel ViewModel => AppState.Backup;
 
     public ObservableCollection<EmailAccount> Accounts => AppState.Accounts.Accounts;

@@ -38,7 +38,9 @@ public partial class AccountsViewModel : ObservableObject
 
     public bool IsEditing => EditingAccountId is not null;
 
-    public string FormTitle => IsEditing ? "Save changes" : "Add account";
+    public string FormTitle => IsEditing
+        ? Localization.Strings.Get("accounts.saveChanges")
+        : Localization.Strings.Get("accounts.add");
 
     partial void OnEditingAccountIdChanged(Guid? value)
     {
@@ -110,7 +112,7 @@ public partial class AccountsViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(Host) || string.IsNullOrWhiteSpace(Username))
         {
-            ConnectionStatus = "Enter IMAP host and username first.";
+            ConnectionStatus = Localization.Strings.Get("accounts.enterHostUser");
             return;
         }
 
@@ -123,7 +125,7 @@ public partial class AccountsViewModel : ObservableObject
 
         if (string.IsNullOrEmpty(password))
         {
-            ConnectionStatus = "No password available: type the (app) password to test a new account.";
+            ConnectionStatus = Localization.Strings.Get("accounts.noPasswordTyped");
             return;
         }
 
@@ -135,16 +137,16 @@ public partial class AccountsViewModel : ObservableObject
             UseSsl = true,
         };
 
-        ConnectionStatus = $"Connecting to {Host}:{Port}...";
+        ConnectionStatus = Localization.Strings.Get("accounts.connecting", Host, Port);
         try
         {
             using var client = await _imapConnectionService.ConnectAsync(testAccount, password);
             var folders = await _imapConnectionService.GetAllFoldersAsync(client);
-            ConnectionStatus = $"Connection OK - authenticated as {Username}, {folders.Count} folder(s) found.";
+            ConnectionStatus = Localization.Strings.Get("accounts.connOk", Username, folders.Count);
         }
         catch (Exception ex)
         {
-            ConnectionStatus = $"Connection failed: {ex.Message}";
+            ConnectionStatus = Localization.Strings.Get("accounts.connFailed", ex.Message);
         }
     }
 

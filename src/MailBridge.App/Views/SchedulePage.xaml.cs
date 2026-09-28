@@ -7,6 +7,7 @@ namespace MailBridge.App.Views;
 
 public sealed partial class SchedulePage : Page
 {
+    public string L(string key) => Localization.Strings.Get(key);
     public SchedulesViewModel ViewModel => AppState.Schedules;
 
     public SchedulePage()
