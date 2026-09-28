@@ -29,6 +29,19 @@ public partial class AccountsViewModel : ObservableObject
     [ObservableProperty]
     private string password = string.Empty;
 
+    [ObservableProperty]
+    private Guid? editingAccountId;
+
+    public bool IsEditing => EditingAccountId is not null;
+
+    public string FormTitle => IsEditing ? "Save changes" : "Add account";
+
+    partial void OnEditingAccountIdChanged(Guid? value)
+    {
+        OnPropertyChanged(nameof(IsEditing));
+        OnPropertyChanged(nameof(FormTitle));
+    }
+
     public AccountsViewModel(ICredentialStore credentialStore, AccountStore accountStore)
     {
         _credentialStore = credentialStore;
@@ -41,10 +54,16 @@ public partial class AccountsViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void AddAccount()
+    private void SaveAccount()
     {
         if (string.IsNullOrWhiteSpace(Host) || string.IsNullOrWhiteSpace(Username))
         {
+            return;
+        }
+
+        if (EditingAccountId is { } editingId)
+        {
+            UpdateAccount(editingId);
             return;
         }
 
@@ -65,7 +84,66 @@ public partial class AccountsViewModel : ObservableObject
 
         Accounts.Add(account);
         _accountStore.Save(Accounts);
+        ResetForm();
+    }
 
+    public void BeginEdit(EmailAccount account)
+    {
+        EditingAccountId = account.Id;
+        DisplayName = account.DisplayName;
+        Host = account.Host;
+        Port = account.Port;
+        Username = account.Username;
+        Password = string.Empty;
+    }
+
+    [RelayCommand]
+    private void CancelEdit() => ResetForm();
+
+    private void UpdateAccount(Guid id)
+    {
+        var account = Accounts.FirstOrDefault(a => a.Id == id);
+        if (account is null)
+        {
+            ResetForm();
+            return;
+        }
+
+        var newKey = $"MailBridge:{Host}:{Username}";
+        var keyChanged = !string.Equals(newKey, account.CredentialKey, StringComparison.Ordinal);
+        var existingSecret = keyChanged
+            ? _credentialStore.TryGet(account.CredentialKey, account.Username)
+            : null;
+
+        if (!string.IsNullOrEmpty(Password))
+        {
+            _credentialStore.Save(newKey, Username, Password);
+        }
+        else if (keyChanged && existingSecret is not null)
+        {
+            _credentialStore.Save(newKey, Username, existingSecret);
+        }
+
+        if (keyChanged && (existingSecret is not null || !string.IsNullOrEmpty(Password)))
+        {
+            _credentialStore.Remove(account.CredentialKey, account.Username);
+        }
+
+        account.DisplayName = string.IsNullOrWhiteSpace(DisplayName) ? Username : DisplayName;
+        account.Host = Host;
+        account.Port = Port;
+        account.Username = Username;
+        account.CredentialKey = newKey;
+
+        var index = Accounts.IndexOf(account);
+        Accounts[index] = account;
+        _accountStore.Save(Accounts);
+        ResetForm();
+    }
+
+    private void ResetForm()
+    {
+        EditingAccountId = null;
         DisplayName = string.Empty;
         Host = string.Empty;
         Port = 993;
