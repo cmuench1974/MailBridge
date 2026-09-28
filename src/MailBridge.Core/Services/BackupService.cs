@@ -49,6 +49,11 @@ public sealed class BackupService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            if (string.IsNullOrEmpty(folder.FullName) || folder.Attributes.HasFlag(FolderAttributes.NoSelect))
+            {
+                continue;
+            }
+
             await folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken).ConfigureAwait(false);
             var uids = await folder.SearchAsync(MailKit.Search.SearchQuery.All, cancellationToken).ConfigureAwait(false);
 

@@ -34,8 +34,31 @@ public sealed class ImapConnectionService
     public async Task<IReadOnlyList<IMailFolder>> GetAllFoldersAsync(ImapClient client, CancellationToken cancellationToken = default)
     {
         var personal = client.GetFolder(client.PersonalNamespaces[0]);
-        var folders = new List<IMailFolder> { personal };
-        folders.AddRange(await personal.GetSubfoldersAsync(true, cancellationToken).ConfigureAwait(false));
+        var folders = new List<IMailFolder>();
+
+        if (client.Inbox is not null && IsSelectable(client.Inbox))
+        {
+            folders.Add(client.Inbox);
+        }
+
+        foreach (var folder in await personal.GetSubfoldersAsync(true, cancellationToken).ConfigureAwait(false))
+        {
+            if (!IsSelectable(folder))
+            {
+                continue;
+            }
+
+            if (client.Inbox is not null && string.Equals(folder.FullName, client.Inbox.FullName, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            folders.Add(folder);
+        }
+
         return folders;
     }
+
+    private static bool IsSelectable(IMailFolder folder) =>
+        !string.IsNullOrEmpty(folder.FullName) && !folder.Attributes.HasFlag(FolderAttributes.NoSelect);
 }
