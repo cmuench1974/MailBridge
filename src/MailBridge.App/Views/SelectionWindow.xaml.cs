@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.IO;
 using MailBridge.App.Localization;
 using MailBridge.App.ViewModels;
 using Microsoft.UI.Xaml;
@@ -74,13 +73,7 @@ public sealed partial class SelectionWindow : Window
         {
             root.AddHandler(UIElement.PointerWheelChangedEvent,
                 new PointerEventHandler(Root_PointerWheel), handledEventsToo: true);
-            root.Loaded += (_, _) =>
-            {
-                FocusList(FolderList);
-                HookViewChanged(FolderList);
-                HookViewChanged(MessageList);
-            };
-            LogWheel($"handler registered on {root.GetType().Name}");
+            root.Loaded += (_, _) => FocusList(FolderList);
         }
 
         TakeSnapshot();
@@ -259,7 +252,6 @@ public sealed partial class SelectionWindow : Window
         var target = ContainsPointer(FolderList, point.Position) ? FolderList
             : ContainsPointer(MessageList, point.Position) ? MessageList
             : null;
-        LogWheel($"wheel delta={point.Properties.MouseWheelDelta} target={(target?.Name ?? "none")} handledBefore={e.Handled}");
         if (e.Handled || target is null)
         {
             return;
@@ -268,63 +260,15 @@ public sealed partial class SelectionWindow : Window
         var scrollViewer = FindDescendant<ScrollViewer>(target);
         if (scrollViewer is null)
         {
-            LogWheel("no ScrollViewer found in visual tree");
             return;
         }
 
         var offset = scrollViewer.VerticalOffset - point.Properties.MouseWheelDelta;
-        LogWheel($"scroll: vOffset={scrollViewer.VerticalOffset:F0} scrollable={scrollViewer.ScrollableHeight:F0} " +
-                 $"extent={scrollViewer.ExtentHeight:F0} viewport={scrollViewer.ViewportHeight:F0} -> target={offset:F0}");
         scrollViewer.ChangeView(scrollViewer.HorizontalOffset, (float)offset, scrollViewer.ZoomFactor, disableAnimation: true);
         e.Handled = true;
     }
 
-    private void FocusList(Control list)
-    {
-        if (list.Focus(FocusState.Programmatic))
-        {
-            LogWheel($"focus set to {list.Name}");
-        }
-    }
-
-    private void HookViewChanged(Control list)
-    {
-        var sv = FindDescendant<ScrollViewer>(list);
-        if (sv is null)
-        {
-            LogWheel($"ViewChanged hook failed for {list.Name}");
-            return;
-        }
-
-        sv.ViewChanged += (_, args) =>
-        {
-            if (args.IsIntermediate is false)
-            {
-                LogWheel($"ViewChanged({list.Name}): vOffset={sv.VerticalOffset:F0}");
-            }
-        };
-    }
-
-    private static void LogWheel(string message)
-    {
-        try
-        {
-            var path = Path.Combine(Path.GetTempPath(), "mailbridge-wheel.log");
-            var line = $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}";
-            if (File.Exists(path) && new FileInfo(path).Length > 32_768)
-            {
-                File.WriteAllText(path, line);
-            }
-            else
-            {
-                File.AppendAllText(path, line);
-            }
-        }
-        catch
-        {
-            // diagnostics only
-        }
-    }
+    private void FocusList(Control list) => list.Focus(FocusState.Programmatic);
 
     private bool ContainsPointer(FrameworkElement element, Point position)
     {
