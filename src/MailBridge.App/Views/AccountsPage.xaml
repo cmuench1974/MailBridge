@@ -15,7 +15,14 @@
             <TextBox Header="Username" Text="{x:Bind ViewModel.Username, Mode=TwoWay}" />
             <PasswordBox Header="Password / app password" Password="{x:Bind ViewModel.Password, Mode=TwoWay}" />
 
-            <Button Content="Add account" Command="{x:Bind ViewModel.AddAccountCommand}" Style="{StaticResource AccentButtonStyle}" />
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Content="{x:Bind ViewModel.FormTitle, Mode=OneWay}" Command="{x:Bind ViewModel.SaveAccountCommand}" Style="{StaticResource AccentButtonStyle}" />
+                <Button Content="Cancel" Command="{x:Bind ViewModel.CancelEditCommand}"
+                        Visibility="{x:Bind ToVisibility(ViewModel.IsEditing), Mode=OneWay}" />
+            </StackPanel>
+            <TextBlock Text="Leave the password empty to keep the stored password."
+                       TextWrapping="Wrap" Opacity="0.7"
+                       Visibility="{x:Bind ToVisibility(ViewModel.IsEditing), Mode=OneWay}" />
 
             <TextBlock Text="Saved accounts" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,0" />
             <ListView ItemsSource="{x:Bind ViewModel.Accounts}" SelectionMode="None">
@@ -25,6 +32,8 @@
                             <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
                             <TextBlock Text="{Binding Host}" Opacity="0.7" />
                             <TextBlock Text="{Binding Username}" Opacity="0.7" />
+                            <Button Content="Edit" Click="OnEditAccountClick" />
+                            <Button Content="Remove" Click="OnRemoveAccountClick" />
                         </StackPanel>
                     </DataTemplate>
                 </ListView.ItemTemplate>
