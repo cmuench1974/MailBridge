@@ -1,4 +1,4 @@
-name: build
+  name: build
 
    on:
      push:
@@ -22,7 +22,7 @@ name: build
 
          - name: Build Core & Tests
            run: dotnet build src/MailBridge.Core/MailBridge.Core.csproj tests/MailBridge.Core.Tests/MailBridge.Core.Tests.csproj -c
-    Release --no-restore
+   Release --no-restore
 
          - name: Test
            run: dotnet test tests/MailBridge.Core.Tests/MailBridge.Core.Tests.csproj -c Release --no-build
