@@ -146,7 +146,7 @@ public partial class BackupViewModel : ObservableObject
         }
     }
 
-    private async Task LoadFolderMessagesAsync(SelectableFolder folder)
+    public async Task LoadFolderMessagesAsync(SelectableFolder folder)
     {
         if (SelectedAccount is null || folder.MessagesLoaded)
         {

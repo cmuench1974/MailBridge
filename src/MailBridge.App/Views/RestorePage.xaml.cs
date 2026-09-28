@@ -41,6 +41,41 @@ public sealed partial class RestorePage : Page
         }
     }
 
+    private async void SelectContentsButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        var button = (Button)sender;
+        button.IsEnabled = false;
+        var opened = false;
+        try
+        {
+            if (ViewModel.BackupFolders.Count == 0)
+            {
+                await ViewModel.LoadContentsCommand.ExecuteAsync(null);
+                if (ViewModel.BackupFolders.Count == 0)
+                {
+                    return;
+                }
+            }
+
+            var window = new SelectionWindow(
+                Localization.Strings.Get("restore.selTitle"),
+                ViewModel.BackupFolders,
+                null,
+                () => ViewModel.LoadContentsCommand.ExecuteAsync(null),
+                () => ViewModel.SelectionSummary);
+            window.Closed += (_, _) => button.IsEnabled = true;
+            window.Activate();
+            opened = true;
+        }
+        finally
+        {
+            if (!opened)
+            {
+                button.IsEnabled = true;
+            }
+        }
+    }
+
     private Visibility ToVisibility(bool value) =>
         value ? Visibility.Visible : Visibility.Collapsed;
 }
