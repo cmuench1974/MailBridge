@@ -1,0 +1,27 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+## WinUI / MSIX
+AppPackages/
+BundleArtifacts/
+*.appx
+*.appxbundle
+*.appxsym
+*.msix
+
+## Rider/VS
+.idea/
+*.DotSettings.user
+
+## Test results
+TestResults/
+*.trx
+
+## Local secrets / user data
+appsettings.local.json
+*.mailbridge-backup/
+*.credlock
