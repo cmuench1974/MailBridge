@@ -22,6 +22,14 @@ public sealed partial class AccountsPage : Page
         }
     }
 
+    private void OnRemoveAccountClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is EmailAccount account)
+        {
+            ViewModel.RemoveAccountCommand.Execute(account);
+        }
+    }
+
     private Visibility ToVisibility(bool value) =>
         value ? Visibility.Visible : Visibility.Collapsed;
 }

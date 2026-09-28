@@ -33,6 +33,7 @@
                             <TextBlock Text="{Binding Host}" Opacity="0.7" />
                             <TextBlock Text="{Binding Username}" Opacity="0.7" />
                             <Button Content="Edit" Click="OnEditAccountClick" />
+                            <Button Content="Remove" Click="OnRemoveAccountClick" />
                         </StackPanel>
                     </DataTemplate>
                 </ListView.ItemTemplate>
