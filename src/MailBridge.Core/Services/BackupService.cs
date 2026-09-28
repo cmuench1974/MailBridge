@@ -32,7 +32,8 @@ public sealed class BackupService
         string password,
         string destinationDirectory,
         IProgress<BackupProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        BackupSelection? selection = null)
     {
         Directory.CreateDirectory(destinationDirectory);
 
@@ -54,8 +55,27 @@ public sealed class BackupService
                 continue;
             }
 
+            FolderSelection? folderSelection = null;
+            if (selection is { IsEmpty: false })
+            {
+                if (!selection.Folders.TryGetValue(folder.FullName, out folderSelection) || !folderSelection.IncludeFolder)
+                {
+                    continue;
+                }
+            }
+
             await folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken).ConfigureAwait(false);
             var uids = await folder.SearchAsync(MailKit.Search.SearchQuery.All, cancellationToken).ConfigureAwait(false);
+
+            if (folderSelection?.IncludedItems is { } wanted)
+            {
+                uids = uids.Where(uid => wanted.Contains(uid.Id.ToString())).ToList();
+                if (uids.Count == 0)
+                {
+                    await folder.CloseAsync(false, cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+            }
 
             var safeFolderName = SanitizeForPath(folder.FullName);
             var folderDir = Path.Combine(destinationDirectory, safeFolderName);

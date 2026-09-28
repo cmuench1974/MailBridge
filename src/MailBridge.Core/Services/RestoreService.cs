@@ -52,7 +52,8 @@ public sealed class RestoreService
         string password,
         RestoreFilter filter,
         Func<RestoreConflict, Task<ConflictResolution>> onConflict,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        BackupSelection? selection = null)
     {
         var outcome = new RestoreOutcome();
         var manifest = await LoadManifestAsync(backupDirectory, cancellationToken).ConfigureAwait(false);
@@ -65,7 +66,21 @@ public sealed class RestoreService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            if (selection is { IsEmpty: false })
+            {
+                if (!selection.Folders.TryGetValue(folderName, out var folderSelection) || !folderSelection.IncludeFolder)
+                {
+                    continue;
+                }
+            }
+
             var index = await LoadFolderIndexAsync(backupDirectory, folderName, cancellationToken).ConfigureAwait(false);
+
+            if (selection?.Folders.TryGetValue(folderName, out var sel) == true && sel?.IncludedItems is { } wanted)
+            {
+                index = index.Where(r => wanted.Contains(r.RelativeEmlPath)).ToList();
+            }
+
             var candidates = index.Where(filter.Matches).ToList();
             if (candidates.Count == 0)
             {
@@ -151,6 +166,29 @@ public sealed class RestoreService
         }
 
         return outcome;
+    }
+
+    /// <summary>
+    /// Reads the manifest and every per-folder index of a backup so the UI
+    /// can present folders and individual messages for selection before a
+    /// restore. Works on the plain backup directory (extract a .zip first).
+    /// </summary>
+    public async Task<BackupContents> GetBackupContentsAsync(string backupDirectory, CancellationToken cancellationToken = default)
+    {
+        var manifest = await LoadManifestAsync(backupDirectory, cancellationToken).ConfigureAwait(false);
+        var contents = new BackupContents
+        {
+            Manifest = manifest,
+            Directory = backupDirectory,
+        };
+
+        foreach (var folderName in manifest.Folders)
+        {
+            var records = await LoadFolderIndexAsync(backupDirectory, folderName, cancellationToken).ConfigureAwait(false);
+            contents.Folders[folderName] = records;
+        }
+
+        return contents;
     }
 
     private static async Task<BackupManifest> LoadManifestAsync(string backupDirectory, CancellationToken cancellationToken)

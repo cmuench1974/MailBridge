@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using MailBridge.App.ViewModels;
 using MailBridge.Core.Models;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -31,4 +32,7 @@ public sealed partial class BackupPage : Page
             ViewModel.DestinationDirectory = folder.Path;
         }
     }
+
+    private Visibility ToVisibility(bool value) =>
+        value ? Visibility.Visible : Visibility.Collapsed;
 }

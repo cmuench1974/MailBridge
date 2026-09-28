@@ -35,7 +35,7 @@ public static class AppState
 
     public static AccountsViewModel Accounts { get; } = new(CredentialStore, AccountStore, ImapConnectionService);
 
-    public static BackupViewModel Backup { get; } = new(BackupServiceInstance, CompressionServiceInstance, CredentialStore, SettingsStoreInstance);
+    public static BackupViewModel Backup { get; } = new(BackupServiceInstance, CompressionServiceInstance, CredentialStore, SettingsStoreInstance, ImapConnectionService);
 
     public static RestoreViewModel Restore { get; } = new(new RestoreService(ImapConnectionService), CompressionServiceInstance, CredentialStore);
 

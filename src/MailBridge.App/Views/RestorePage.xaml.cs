@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using MailBridge.App.ViewModels;
 using MailBridge.Core.Models;
 using MailBridge.Core.Services;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -39,4 +40,7 @@ public sealed partial class RestorePage : Page
             ViewModel.BackupPath = file.Path;
         }
     }
+
+    private Visibility ToVisibility(bool value) =>
+        value ? Visibility.Visible : Visibility.Collapsed;
 }
