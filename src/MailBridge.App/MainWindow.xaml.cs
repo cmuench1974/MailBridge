@@ -1,5 +1,6 @@
 using MailBridge.App.ViewModels;
 using MailBridge.App.Views;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -7,10 +8,15 @@ namespace MailBridge.App;
 
 public sealed partial class MainWindow : Window
 {
+    private const int DefaultWidth = 1180;
+    private const int DefaultHeight = 780;
+
     public MainWindow()
     {
         InitializeComponent();
         Title = "MailBridge";
+
+        ConfigureWindow();
 
         ApplyTheme();
         AppState.Settings.PropertyChanged += (_, args) =>
@@ -20,6 +26,26 @@ public sealed partial class MainWindow : Window
                 ApplyTheme();
             }
         };
+    }
+
+    private void ConfigureWindow()
+    {
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+        var appWindow = AppWindow.GetFromWindowId(windowId);
+
+        var iconPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico");
+        if (System.IO.File.Exists(iconPath))
+        {
+            appWindow.SetIcon(iconPath);
+        }
+
+        appWindow.Resize(new Windows.Graphics.SizeInt32(DefaultWidth, DefaultHeight));
+
+        var area = DisplayArea.Primary.WorkArea;
+        appWindow.Move(new Windows.Graphics.PointInt32(
+            area.X + Math.Max(0, (area.Width - DefaultWidth) / 2),
+            area.Y + Math.Max(0, (area.Height - DefaultHeight) / 2)));
     }
 
     private void ApplyTheme()

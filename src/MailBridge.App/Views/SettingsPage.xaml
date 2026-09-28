@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <ScrollViewer>
-        <StackPanel Padding="24" Spacing="16" MaxWidth="600" HorizontalAlignment="Left">
+        <StackPanel Padding="24" Spacing="16" MaxWidth="560" HorizontalAlignment="Center" VerticalAlignment="Center">
             <TextBlock Text="Settings" Style="{StaticResource TitleTextBlockStyle}" />
             <TextBlock Text="Defaults for new backups and the app appearance. Saved values pre-fill the Backup and Schedule pages; the theme applies immediately."
                        TextWrapping="Wrap" Opacity="0.7" />
