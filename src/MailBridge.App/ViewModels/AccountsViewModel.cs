@@ -3,12 +3,14 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MailBridge.Core.Models;
 using MailBridge.Core.Security;
+using MailBridge.Core.Services;
 
 namespace MailBridge.App.ViewModels;
 
 public partial class AccountsViewModel : ObservableObject
 {
     private readonly ICredentialStore _credentialStore;
+    private readonly AccountStore _accountStore;
 
     public ObservableCollection<EmailAccount> Accounts { get; } = new();
 
@@ -27,9 +29,15 @@ public partial class AccountsViewModel : ObservableObject
     [ObservableProperty]
     private string password = string.Empty;
 
-    public AccountsViewModel(ICredentialStore credentialStore)
+    public AccountsViewModel(ICredentialStore credentialStore, AccountStore accountStore)
     {
         _credentialStore = credentialStore;
+        _accountStore = accountStore;
+
+        foreach (var account in _accountStore.Load())
+        {
+            Accounts.Add(account);
+        }
     }
 
     [RelayCommand]
@@ -56,6 +64,7 @@ public partial class AccountsViewModel : ObservableObject
         }
 
         Accounts.Add(account);
+        _accountStore.Save(Accounts);
 
         DisplayName = string.Empty;
         Host = string.Empty;
@@ -69,5 +78,6 @@ public partial class AccountsViewModel : ObservableObject
     {
         _credentialStore.Remove(account.CredentialKey, account.Username);
         Accounts.Remove(account);
+        _accountStore.Save(Accounts);
     }
 }
