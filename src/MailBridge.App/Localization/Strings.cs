@@ -95,9 +95,9 @@ public static class Strings
         ["schedule.removed"] = "Schedule removed.",
 
         ["settings.title"] = "Settings",
-        ["settings.intro"] = "Defaults for new backups, the app appearance and the UI language. Saved values pre-fill the Backup and Schedule pages; the theme applies immediately.",
+        ["settings.intro"] = "Defaults for new backups, the app appearance and the UI language. Saved values pre-fill the Backup and Schedule pages; appearance and language apply as soon as you save.",
         ["settings.language"] = "Language",
-        ["settings.languageNote"] = "Applied after restarting MailBridge.",
+        ["settings.languageNote"] = "Applied immediately when settings are saved.",
         ["settings.theme"] = "Theme",
         ["settings.defaultDir"] = "Default backup destination folder",
         ["settings.defaultZip"] = "Compress backups into a single .zip file by default",
@@ -188,9 +188,9 @@ public static class Strings
         ["schedule.removed"] = "Zeitplan entfernt.",
 
         ["settings.title"] = "Einstellungen",
-        ["settings.intro"] = "Standards für neue Backups, das Erscheinungsbild und die Sprache der Oberfläche. Gespeicherte Werte übernehmen die Backup- und Zeitplan-Seiten; das Erscheinungsbild greift sofort.",
+        ["settings.intro"] = "Standards für neue Backups, das Erscheinungsbild und die Sprache der Oberfläche. Gespeicherte Werte übernehmen die Backup- und Zeitplan-Seiten; Erscheinungsbild und Sprache werden beim Speichern sofort übernommen.",
         ["settings.language"] = "Sprache",
-        ["settings.languageNote"] = "Wird nach dem Neustart von MailBridge angewendet.",
+        ["settings.languageNote"] = "Wird beim Speichern der Einstellungen sofort angewendet.",
         ["settings.theme"] = "Erscheinungsbild",
         ["settings.defaultDir"] = "Standard-Zielordner für Backups",
         ["settings.defaultZip"] = "Backups standardmäßig in eine einzelne .zip-Datei komprimieren",

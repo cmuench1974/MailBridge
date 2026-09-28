@@ -7,7 +7,7 @@ public partial class App : Application
 {
     private Window? _window;
 
-    public static Window MainWindowInstance { get; private set; } = null!;
+    public static Window MainWindowInstance { get; set; } = null!;
 
     public App()
     {

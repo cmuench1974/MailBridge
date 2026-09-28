@@ -14,6 +14,8 @@ public sealed partial class MainWindow : Window
 
     public string L(string key) => Strings.Get(key);
 
+    private string _appliedLanguage;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -21,6 +23,7 @@ public sealed partial class MainWindow : Window
 
         ConfigureWindow();
 
+        _appliedLanguage = AppState.Settings.SelectedLanguageCode;
         ApplyTheme();
         AppState.Settings.PropertyChanged += (_, args) =>
         {
@@ -29,6 +32,28 @@ public sealed partial class MainWindow : Window
                 ApplyTheme();
             }
         };
+        AppState.Settings.Saved += OnSettingsSaved;
+        Closed += (_, _) => AppState.Settings.Saved -= OnSettingsSaved;
+    }
+
+    private void OnSettingsSaved(object? sender, EventArgs e)
+    {
+        if (AppState.Settings.SelectedLanguageCode != _appliedLanguage)
+        {
+            // Language applies to every page label and all localized
+            // strings - the cleanest way to rebind everything is a fresh
+            // shell. Settings are already persisted at this point.
+            AppState.Settings.Saved -= OnSettingsSaved;
+            _appliedLanguage = AppState.Settings.SelectedLanguageCode;
+
+            var replacement = new MainWindow();
+            App.MainWindowInstance = replacement;
+            replacement.Activate();
+            Close();
+            return;
+        }
+
+        ApplyTheme();
     }
 
     private void ConfigureWindow()

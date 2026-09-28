@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MailBridge.App.Localization;
 using MailBridge.Core.Services;
 
 namespace MailBridge.App.ViewModels;
@@ -16,6 +17,10 @@ public partial class SettingsViewModel : ObservableObject
     private string selectedLanguage = "English";
 
     public string SelectedLanguageCode => Localization.Strings.DisplayNameToCode(SelectedLanguage);
+
+    /// <summary>Raised after settings were persisted, so the shell can
+    /// apply language (and theme) changes without an app restart.</summary>
+    public event EventHandler? Saved;
 
     [ObservableProperty]
     private string selectedTheme = "System";
@@ -43,6 +48,8 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void Save()
     {
+        Strings.SetLanguage(SelectedLanguageCode);
+
         _settingsStore.Save(new Core.Models.AppSettings
         {
             Language = SelectedLanguageCode,
@@ -52,5 +59,6 @@ public partial class SettingsViewModel : ObservableObject
         });
 
         StatusText = Localization.Strings.Get("settings.saved");
+        Saved?.Invoke(this, EventArgs.Empty);
     }
 }
