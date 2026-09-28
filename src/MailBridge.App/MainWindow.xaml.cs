@@ -32,6 +32,9 @@ public sealed partial class MainWindow : Window
                 case "restore":
                     ContentFrame.Navigate(typeof(RestorePage));
                     break;
+                case "schedule":
+                    ContentFrame.Navigate(typeof(SchedulePage));
+                    break;
             }
         }
     }

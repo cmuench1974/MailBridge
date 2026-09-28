@@ -7,6 +7,8 @@ namespace MailBridge.Core.Models;
 /// </summary>
 public sealed class EmailAccount
 {
+    public Guid Id { get; set; } = Guid.NewGuid();
+
     public string DisplayName { get; set; } = string.Empty;
 
     public string Host { get; set; } = string.Empty;

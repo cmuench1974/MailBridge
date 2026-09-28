@@ -14,7 +14,8 @@ Early scaffold — see the project board / issues for progress. Not yet function
 - **Restore**: pick a backup (folder or `.zip`), pick a target IMAP account, filter which messages to restore (by folder, date range, sender, subject/text search), and upload them via IMAP APPEND.
 - **Duplicate detection on restore**: before uploading, MailBridge checks the target folder for an existing message that matches on multiple attributes — Message-ID header (strongest signal), plus From, Date, Subject and size as corroborating signals — to decide if a message already exists.
 - **Conflict resolution**: when a duplicate (or a message with the same identifying attributes but different content) is found, you choose: **Replace**, **Replace all** (apply to remaining conflicts in this run), **Skip**, **Skip all**, or **Abort** the restore. MailBridge only ever treats a match as a true duplicate (safe to skip) when the compared attributes are actually identical; if they differ it is flagged as a conflict for you to decide rather than silently skipped or silently replaced.
-- Fluent Design UI (WinUI 3 `NavigationView`, Mica/acrylic, light & dark theme) with pages for Accounts, Backup, Restore, and History/Log.
+- **Scheduled backups**: configure a recurring (daily/weekly) backup per account, including destination folder and compression choice. Schedules run via the Windows Task Scheduler, so they fire even if MailBridge isn't currently open; the app is launched headlessly with a `--run-scheduled-backup <id>` flag, performs the backup, records success/failure + a summary, and exits.
+- Fluent Design UI (WinUI 3 `NavigationView`, Mica/acrylic, light & dark theme) with pages for Accounts, Backup, Restore, and Schedule.
 
 ## Authentication note
 
