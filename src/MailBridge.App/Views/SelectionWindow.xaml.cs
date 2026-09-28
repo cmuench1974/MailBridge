@@ -74,7 +74,12 @@ public sealed partial class SelectionWindow : Window
         {
             root.AddHandler(UIElement.PointerWheelChangedEvent,
                 new PointerEventHandler(Root_PointerWheel), handledEventsToo: true);
-            root.Loaded += (_, _) => FocusList(FolderList);
+            root.Loaded += (_, _) =>
+            {
+                FocusList(FolderList);
+                HookViewChanged(FolderList);
+                HookViewChanged(MessageList);
+            };
             LogWheel($"handler registered on {root.GetType().Name}");
         }
 
@@ -263,11 +268,14 @@ public sealed partial class SelectionWindow : Window
         var scrollViewer = FindDescendant<ScrollViewer>(target);
         if (scrollViewer is null)
         {
+            LogWheel("no ScrollViewer found in visual tree");
             return;
         }
 
         var offset = scrollViewer.VerticalOffset - point.Properties.MouseWheelDelta;
-        scrollViewer.ChangeView(null, (float)offset, null, disableAnimation: false);
+        LogWheel($"scroll: vOffset={scrollViewer.VerticalOffset:F0} scrollable={scrollViewer.ScrollableHeight:F0} " +
+                 $"extent={scrollViewer.ExtentHeight:F0} viewport={scrollViewer.ViewportHeight:F0} -> target={offset:F0}");
+        scrollViewer.ChangeView(scrollViewer.HorizontalOffset, (float)offset, scrollViewer.ZoomFactor, disableAnimation: true);
         e.Handled = true;
     }
 
@@ -277,6 +285,24 @@ public sealed partial class SelectionWindow : Window
         {
             LogWheel($"focus set to {list.Name}");
         }
+    }
+
+    private void HookViewChanged(Control list)
+    {
+        var sv = FindDescendant<ScrollViewer>(list);
+        if (sv is null)
+        {
+            LogWheel($"ViewChanged hook failed for {list.Name}");
+            return;
+        }
+
+        sv.ViewChanged += (_, args) =>
+        {
+            if (args.IsIntermediate is false)
+            {
+                LogWheel($"ViewChanged({list.Name}): vOffset={sv.VerticalOffset:F0}");
+            }
+        };
     }
 
     private static void LogWheel(string message)
