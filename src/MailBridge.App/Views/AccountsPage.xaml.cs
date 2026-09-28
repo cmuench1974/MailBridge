@@ -22,9 +22,25 @@ public sealed partial class AccountsPage : Page
         }
     }
 
-    private void OnRemoveAccountClick(object sender, RoutedEventArgs e)
+    private async void OnRemoveAccountClick(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.DataContext is EmailAccount account)
+        if ((sender as FrameworkElement)?.DataContext is not EmailAccount account)
+        {
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "Remove account?",
+            Content = $"Remove '{account.DisplayName}' ({account.Username} on {account.Host})? "
+                      + "Its stored password will be deleted and any scheduled backup for it will no longer run.",
+            PrimaryButtonText = "Remove",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+        };
+
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
         {
             ViewModel.RemoveAccountCommand.Execute(account);
         }
