@@ -37,7 +37,7 @@ public sealed partial class SelectionWindow : Window
     {
         InitializeComponent();
         Title = title;
-        AppWindow.Resize(new SizeInt32 { Width = 820, Height = 560 });
+        AppWindow.Resize(new SizeInt32 { Width = 900, Height = 620 });
 
         _folders = folders;
         _loadFolderMessages = loadFolderMessages;
