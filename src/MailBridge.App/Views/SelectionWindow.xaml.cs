@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using MailBridge.App.Localization;
 using MailBridge.App.ViewModels;
 using Microsoft.UI.Xaml;
@@ -54,12 +55,27 @@ public sealed partial class SelectionWindow : Window
         OkButton.Content = Strings.Get("common.ok");
         ReloadButton.Visibility = reload is null ? Visibility.Collapsed : Visibility.Visible;
 
+        // WM_MOUSEWHEEL is routed to the focused window, not the hovered one.
+        // Keep focus inside THIS window (on activation and when the pointer
+        // hovers a list) so wheel input can reach the lists at all.
+        FolderList.PointerEntered += (_, _) => FocusList(FolderList);
+        MessageList.PointerEntered += (_, _) => FocusList(MessageList);
+        Activated += (w, args) =>
+        {
+            if (args.WindowActivationState != WindowActivationState.Deactivated)
+            {
+                FocusList(FolderList);
+            }
+        };
+
         // WinUI wheel workaround: intercept wheel events at the root, even
         // when an inner ScrollViewer marks them handled, and scroll manually.
         if (Content is FrameworkElement root)
         {
             root.AddHandler(UIElement.PointerWheelChangedEvent,
                 new PointerEventHandler(Root_PointerWheel), handledEventsToo: true);
+            root.Loaded += (_, _) => FocusList(FolderList);
+            LogWheel($"handler registered on {root.GetType().Name}");
         }
 
         TakeSnapshot();
@@ -238,7 +254,8 @@ public sealed partial class SelectionWindow : Window
         var target = ContainsPointer(FolderList, point.Position) ? FolderList
             : ContainsPointer(MessageList, point.Position) ? MessageList
             : null;
-        if (target is null)
+        LogWheel($"wheel delta={point.Properties.MouseWheelDelta} target={(target?.Name ?? "none")} handledBefore={e.Handled}");
+        if (e.Handled || target is null)
         {
             return;
         }
@@ -252,6 +269,35 @@ public sealed partial class SelectionWindow : Window
         var offset = scrollViewer.VerticalOffset - point.Properties.MouseWheelDelta;
         scrollViewer.ChangeView(null, (float)offset, null, disableAnimation: false);
         e.Handled = true;
+    }
+
+    private void FocusList(Control list)
+    {
+        if (list.Focus(FocusState.Programmatic))
+        {
+            LogWheel($"focus set to {list.Name}");
+        }
+    }
+
+    private static void LogWheel(string message)
+    {
+        try
+        {
+            var path = Path.Combine(Path.GetTempPath(), "mailbridge-wheel.log");
+            var line = $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}";
+            if (File.Exists(path) && new FileInfo(path).Length > 32_768)
+            {
+                File.WriteAllText(path, line);
+            }
+            else
+            {
+                File.AppendAllText(path, line);
+            }
+        }
+        catch
+        {
+            // diagnostics only
+        }
     }
 
     private bool ContainsPointer(FrameworkElement element, Point position)
