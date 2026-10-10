@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using MailBridge.App.Localization;
 using MailBridge.App.ViewModels;
 using MailBridge.App.Views;
@@ -19,21 +20,34 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        Title = "MailBridge";
+        Title = Strings.Get("app.windowTitle"); // taskbar / Alt+Tab
+
+        // Extend content into the title bar and use the custom TitleBar as drag region.
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+        var version = typeof(App).Assembly.GetName().Version;
+        AppTitleBar.Subtitle = version is null ? string.Empty : Strings.Get("app.version", version.ToString(3));
 
         ConfigureWindow();
 
         _appliedLanguage = AppState.Settings.SelectedLanguageCode;
-        ApplyTheme();
-        AppState.Settings.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(SettingsViewModel.SelectedTheme))
-            {
-                ApplyTheme();
-            }
-        };
+        AppState.Theme.Register(this);
+        AppState.Theme.ApplyTheme(AppState.Settings.SelectedTheme);
+        AppState.Settings.PropertyChanged += OnSettingsPropertyChanged;
         AppState.Settings.Saved += OnSettingsSaved;
-        Closed += (_, _) => AppState.Settings.Saved -= OnSettingsSaved;
+        Closed += (_, _) =>
+        {
+            AppState.Settings.PropertyChanged -= OnSettingsPropertyChanged;
+            AppState.Settings.Saved -= OnSettingsSaved;
+        };
+    }
+
+    private void OnSettingsPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(SettingsViewModel.SelectedTheme))
+        {
+            AppState.Theme.ApplyTheme(AppState.Settings.SelectedTheme);
+        }
     }
 
     private void OnSettingsSaved(object? sender, EventArgs e)
@@ -53,7 +67,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        ApplyTheme();
+        AppState.Theme.ApplyTheme(AppState.Settings.SelectedTheme);
     }
 
     private void ConfigureWindow()
@@ -62,7 +76,7 @@ public sealed partial class MainWindow : Window
         var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
         var appWindow = AppWindow.GetFromWindowId(windowId);
 
-        var iconPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico");
+        var iconPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
         if (System.IO.File.Exists(iconPath))
         {
             appWindow.SetIcon(iconPath);
@@ -76,17 +90,9 @@ public sealed partial class MainWindow : Window
             area.Y + Math.Max(0, (area.Height - DefaultHeight) / 2)));
     }
 
-    private void ApplyTheme()
+    private void AppTitleBar_PaneToggleRequested(TitleBar sender, object args)
     {
-        if (Content is FrameworkElement root)
-        {
-            root.RequestedTheme = AppState.Settings.SelectedTheme switch
-            {
-                "Light" => ElementTheme.Light,
-                "Dark" => ElementTheme.Dark,
-                _ => ElementTheme.Default,
-            };
-        }
+        RootNavigationView.IsPaneOpen = !RootNavigationView.IsPaneOpen;
     }
 
     private void RootNavigationView_Loaded(object sender, RoutedEventArgs e)

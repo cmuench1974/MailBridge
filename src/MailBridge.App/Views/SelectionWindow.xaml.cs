@@ -40,7 +40,18 @@ public sealed partial class SelectionWindow : Window
     {
         InitializeComponent();
         Title = title;
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+        AppTitleBar.Title = title;
         AppWindow.Resize(new SizeInt32 { Width = 900, Height = 620 });
+
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
+        if (File.Exists(iconPath))
+        {
+            AppWindow.SetIcon(iconPath);
+        }
+
+        AppState.Theme.Register(this);
 
         _folders = folders;
         _loadFolderMessages = loadFolderMessages;

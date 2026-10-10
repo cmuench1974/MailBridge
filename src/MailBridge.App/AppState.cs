@@ -1,5 +1,6 @@
 using MailBridge.App.Scheduling;
 using MailBridge.App.Security;
+using MailBridge.App.Services;
 using MailBridge.App.ViewModels;
 using MailBridge.Core.Services;
 
@@ -30,6 +31,8 @@ public static class AppState
 
     public static ScheduledBackupRunner ScheduledBackupRunner { get; } =
         new(AccountStore, ScheduleStore, CredentialStore, BackupServiceInstance, CompressionServiceInstance);
+
+    public static ThemeService Theme { get; } = new();
 
     public static SettingsViewModel Settings { get; } = new(SettingsStoreInstance);
 
