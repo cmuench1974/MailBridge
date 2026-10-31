@@ -35,6 +35,13 @@
                     <StackPanel Padding="16" Spacing="12">
                         <TextBlock Text="{x:Bind L('accounts.form')}" Style="{StaticResource CardTitleStyle}" />
 
+                        <ComboBox Header="{x:Bind L('accounts.template')}" ItemsSource="{x:Bind ViewModel.TemplateOptions}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedTemplate, Mode=TwoWay}"
+                                  DisplayMemberPath="Name" HorizontalAlignment="Stretch" />
+                        <TextBlock Text="{x:Bind ViewModel.TemplateHint, Mode=OneWay}"
+                                   Style="{StaticResource HintTextStyle}" Margin="0,-6,0,0"
+                                   Visibility="{x:Bind ToVisibility(ViewModel.HasTemplateHint), Mode=OneWay}" />
+
                         <TextBox Header="{x:Bind L('accounts.displayName')}" Text="{x:Bind ViewModel.DisplayName, Mode=TwoWay}" />
                         <TextBox Header="{x:Bind L('accounts.host')}" PlaceholderText="imap.example.com" Text="{x:Bind ViewModel.Host, Mode=TwoWay}" />
                         <NumberBox Header="{x:Bind L('accounts.port')}" Value="{x:Bind ViewModel.Port, Mode=TwoWay}" />

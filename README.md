@@ -19,7 +19,7 @@ Early scaffold — see the project board / issues for progress. Not yet function
 
 ## Authentication note
 
-Gmail and Microsoft 365/Outlook.com have disabled plain username/password IMAP login and require OAuth2, which needs an app registration (Google Cloud / Entra ID client ID) that only you, the app owner, can create. v1 targets **username + app-password** IMAP providers (e.g. GMX, Web.de, Fastmail, generic IMAP/Dovecot/Cyrus servers, self-hosted). OAuth2 support for Gmail/Outlook is planned as a follow-up once a client ID is registered.
+Microsoft 365/Outlook.com have disabled plain username/password IMAP login and require OAuth2, which needs an app registration (Entra ID client ID) that only you, the app owner, can create. v1 targets **username + (app-)password** IMAP providers. The Accounts page offers templates for popular ones (`MailProviderTemplates`: AWS WorkMail, eclipso, Fastmail, freenet, Gmail with an app password, GMX, iCloud, IONOS, mailbox.org, Posteo, Strato, T-Online, WEB.DE, Yahoo, Zoho); generic IMAP/Dovecot/Cyrus or self-hosted servers can be entered manually. OAuth2 support for Outlook is planned as a follow-up once a client ID is registered.
 
 ## Solution layout
 

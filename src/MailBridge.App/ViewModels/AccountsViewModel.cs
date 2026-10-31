@@ -15,6 +15,58 @@ public partial class AccountsViewModel : ObservableObject
 
     public ObservableCollection<EmailAccount> Accounts { get; } = new();
 
+    /// <summary>"Manual entry" first, then one option per provider template.</summary>
+    public IReadOnlyList<MailTemplateOption> TemplateOptions { get; } =
+        MailProviderTemplates.All.Select(t => new MailTemplateOption(t)).Prepend(new MailTemplateOption(null)).ToList();
+
+    [ObservableProperty]
+    private MailTemplateOption? selectedTemplate;
+
+    public string TemplateHint => SelectedTemplate?.Template is { } template
+        ? Localization.Strings.Get($"accounts.templateHint.{template.Setup}")
+        : string.Empty;
+
+    public bool HasTemplateHint => SelectedTemplate?.Template is not null;
+
+    private bool _applyingTemplate;
+
+    partial void OnSelectedTemplateChanged(MailTemplateOption? value)
+    {
+        OnPropertyChanged(nameof(TemplateHint));
+        OnPropertyChanged(nameof(HasTemplateHint));
+
+        if (value is null)
+        {
+            // The ComboBox clears its selection when its page unloads.
+            SyncTemplateWithForm();
+        }
+        else if (value.Template is { } template && !_applyingTemplate)
+        {
+            _applyingTemplate = true;
+            Host = template.Host;
+            Port = template.Port;
+            _applyingTemplate = false;
+        }
+    }
+
+    partial void OnHostChanged(string value) => SyncTemplateWithForm();
+
+    partial void OnPortChanged(int value) => SyncTemplateWithForm();
+
+    /// <summary>Keeps the template selection in line with manually edited connection details.</summary>
+    private void SyncTemplateWithForm()
+    {
+        if (_applyingTemplate)
+        {
+            return;
+        }
+
+        var match = MailProviderTemplates.Find(Host, Port);
+        _applyingTemplate = true;
+        SelectedTemplate = TemplateOptions.First(o => o.Template == match);
+        _applyingTemplate = false;
+    }
+
     [ObservableProperty]
     private string displayName = string.Empty;
 
@@ -53,6 +105,7 @@ public partial class AccountsViewModel : ObservableObject
         _credentialStore = credentialStore;
         _accountStore = accountStore;
         _imapConnectionService = imapConnectionService;
+        SelectedTemplate = TemplateOptions[0];
 
         foreach (var account in _accountStore.Load())
         {

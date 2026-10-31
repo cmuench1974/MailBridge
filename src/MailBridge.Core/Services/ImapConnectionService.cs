@@ -7,8 +7,8 @@ namespace MailBridge.Core.Services;
 
 /// <summary>
 /// Opens and authenticates IMAP connections. v1 supports username +
-/// (app-)password only; OAuth2 (required by Gmail/Outlook) is a follow-up
-/// once an app registration exists.
+/// (app-)password only; OAuth2 (required by Outlook.com/Microsoft 365) is a
+/// follow-up once an app registration exists.
 /// </summary>
 public sealed class ImapConnectionService
 {
