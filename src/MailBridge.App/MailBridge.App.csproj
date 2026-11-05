@@ -5,6 +5,9 @@
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <RootNamespace>MailBridge.App</RootNamespace>
     <OutputType>WinExe</OutputType>
+    <!-- Without this the build does not embed app.manifest, so the app runs without PerMonitorV2
+         DPI awareness and Windows bitmap-stretches (blurs) it at display scaling above 100 %. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <UseWinUI>true</UseWinUI>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
