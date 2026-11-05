@@ -49,25 +49,32 @@ public sealed class OAuthClient
     public Task<OAuthTokens> RedeemCodeAsync(OAuthProviderOptions options, string code, string redirectUri, string codeVerifier, CancellationToken cancellationToken = default) =>
         RequestTokensAsync(options, new Dictionary<string, string>
         {
-            ["client_id"] = options.ClientId,
             ["grant_type"] = "authorization_code",
             ["code"] = code,
             ["redirect_uri"] = redirectUri,
             ["code_verifier"] = codeVerifier,
-            ["scope"] = string.Join(' ', options.Scopes),
         }, cancellationToken);
 
     public Task<OAuthTokens> RefreshAsync(OAuthProviderOptions options, string refreshToken, CancellationToken cancellationToken = default) =>
         RequestTokensAsync(options, new Dictionary<string, string>
         {
-            ["client_id"] = options.ClientId,
             ["grant_type"] = "refresh_token",
             ["refresh_token"] = refreshToken,
-            ["scope"] = string.Join(' ', options.Scopes),
         }, cancellationToken);
 
     private async Task<OAuthTokens> RequestTokensAsync(OAuthProviderOptions options, Dictionary<string, string> form, CancellationToken cancellationToken)
     {
+        form["client_id"] = options.ClientId;
+        if (!string.IsNullOrEmpty(options.ClientSecret))
+        {
+            form["client_secret"] = options.ClientSecret;
+        }
+
+        if (options.IncludeScopeInTokenRequests)
+        {
+            form["scope"] = string.Join(' ', options.Scopes);
+        }
+
         using var content = new FormUrlEncodedContent(form);
         using var response = await _http.PostAsync(options.TokenEndpoint, content, cancellationToken).ConfigureAwait(false);
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);

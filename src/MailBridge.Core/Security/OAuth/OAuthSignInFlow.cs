@@ -26,7 +26,7 @@ public sealed class OAuthSignInFlow
     {
         if (!options.IsConfigured)
         {
-            throw new InvalidOperationException("No OAuth2 client ID is configured for this provider.");
+            throw new InvalidOperationException($"{options.DisplayName} sign-in is not configured in this build (no OAuth2 client ID).");
         }
 
         var codeVerifier = Pkce.CreateCodeVerifier();

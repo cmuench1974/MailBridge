@@ -6,6 +6,7 @@ using MailBridge.Core.Models;
 using MailBridge.Core.Security;
 using MailBridge.Core.Security.OAuth;
 using MailBridge.Core.Services;
+using Strings = MailBridge.App.Localization.Strings;
 
 namespace MailBridge.App.ViewModels;
 
@@ -13,6 +14,8 @@ public partial class AccountsViewModel : ObservableObject
 {
     /// <summary>How long the browser sign-in may take before MailBridge stops waiting for it.</summary>
     private static readonly TimeSpan SignInTimeout = TimeSpan.FromMinutes(5);
+
+    private static readonly AccountAuthMethod[] PasswordOnly = { AccountAuthMethod.Password };
 
     private readonly ICredentialStore _credentialStore;
     private readonly AccountCredentialProvider _credentials;
@@ -23,6 +26,9 @@ public partial class AccountsViewModel : ObservableObject
     /// <summary>Result of the last browser sign-in, kept until the account is saved or the form is reset.</summary>
     private OAuthTokens? _pendingSignIn;
 
+    /// <summary>The template <see cref="SelectedAuthMethod"/> was chosen for; a different template resets it.</summary>
+    private MailTemplateOption? _authMethodChosenFor;
+
     public ObservableCollection<EmailAccount> Accounts { get; } = new();
 
     /// <summary>"Manual entry" first, then one option per provider template.</summary>
@@ -32,32 +38,63 @@ public partial class AccountsViewModel : ObservableObject
     [ObservableProperty]
     private MailTemplateOption? selectedTemplate;
 
+    [ObservableProperty]
+    private AccountAuthMethod selectedAuthMethod = AccountAuthMethod.Password;
+
+    private IReadOnlyList<AccountAuthMethod> TemplateAuthMethods => SelectedTemplate?.Template?.AuthMethods ?? PasswordOnly;
+
+    /// <summary>Sign-in methods the selected provider accepts (manual entry: password only).</summary>
+    public IReadOnlyList<AuthMethodOption> AuthMethodOptions => TemplateAuthMethods.Select(AuthMethodOption.For).ToList();
+
+    public bool HasAuthMethodChoice => TemplateAuthMethods.Count > 1;
+
+    public AuthMethodOption? SelectedAuthMethodOption
+    {
+        get => AuthMethodOption.For(SelectedAuthMethod);
+        set
+        {
+            // While its item list is being replaced the ComboBox reports null or writes back an
+            // entry of the previous template; only accept methods the current template offers.
+            if (value is not null && TemplateAuthMethods.Contains(value.Method))
+            {
+                SelectedAuthMethod = value.Method;
+            }
+        }
+    }
+
     public string TemplateHint => SelectedTemplate?.Template is { } template
-        ? Localization.Strings.Get($"accounts.templateHint.{template.Setup}")
+        ? IsOAuth
+            ? Strings.Get($"accounts.authHint.{SelectedAuthMethod}")
+            : Strings.Get($"accounts.templateHint.{template.Setup}")
         : string.Empty;
 
     public bool HasTemplateHint => SelectedTemplate?.Template is not null;
 
-    /// <summary>The sign-in method of the form, decided by the provider template (manual entry = password).</summary>
-    public AccountAuthMethod SelectedAuthMethod => SelectedTemplate?.Template?.AuthMethod ?? AccountAuthMethod.Password;
-
-    public bool IsOAuth => SelectedAuthMethod == AccountAuthMethod.MicrosoftOAuth2;
+    public bool IsOAuth => SelectedAuthMethod != AccountAuthMethod.Password;
 
     public bool IsPasswordAuth => !IsOAuth;
 
     public bool ShowKeepPasswordHint => IsEditing && IsPasswordAuth;
 
-    /// <summary>False when this build has no Microsoft client ID; the sign-in button is disabled then.</summary>
-    public bool IsOAuthAvailable => _credentials.MicrosoftOptions.IsConfigured;
+    /// <summary>False for passwords and for OAuth2 providers this build has no client ID for.</summary>
+    public bool IsOAuthAvailable => IsOAuth && _credentials.IsAvailable(SelectedAuthMethod);
 
-    public string SignInButtonText => Localization.Strings.Get(
-        EditingAccount?.AuthMethod == AccountAuthMethod.MicrosoftOAuth2 ? "accounts.signInAgain" : "accounts.signIn");
+    private string ProviderName => CredentialErrors.ProviderName(SelectedAuthMethod);
 
-    public string OAuthHint => !IsOAuthAvailable
-        ? Localization.Strings.Get("accounts.oauthNotConfigured")
-        : EditingAccount?.AuthMethod == AccountAuthMethod.MicrosoftOAuth2 && _pendingSignIn is null
-            ? Localization.Strings.Get("accounts.keepSignInHint")
-            : string.Empty;
+    /// <summary>True when the account being edited already has a stored sign-in of the selected kind.</summary>
+    private bool EditingHasStoredSignIn => IsOAuth && EditingAccount?.AuthMethod == SelectedAuthMethod;
+
+    public string SignInButtonText => EditingHasStoredSignIn
+        ? Strings.Get("accounts.signInAgain")
+        : Strings.Get("accounts.signIn", ProviderName);
+
+    public string OAuthHint => !IsOAuth
+        ? string.Empty
+        : !IsOAuthAvailable
+            ? CredentialErrors.NotConfigured(SelectedAuthMethod)
+            : EditingHasStoredSignIn && _pendingSignIn is null
+                ? Strings.Get("accounts.keepSignInHint", ProviderName)
+                : string.Empty;
 
     public bool HasOAuthHint => OAuthHint.Length > 0;
 
@@ -67,10 +104,6 @@ public partial class AccountsViewModel : ObservableObject
 
     partial void OnSelectedTemplateChanged(MailTemplateOption? value)
     {
-        OnPropertyChanged(nameof(TemplateHint));
-        OnPropertyChanged(nameof(HasTemplateHint));
-        OnAuthMethodChanged();
-
         if (value is null)
         {
             // The ComboBox clears its selection when its page unloads.
@@ -78,11 +111,20 @@ public partial class AccountsViewModel : ObservableObject
             return;
         }
 
-        if (value.Template?.AuthMethod != AccountAuthMethod.MicrosoftOAuth2)
+        // Replace the method list before the selection, so the ComboBox never has to show a
+        // method that is not in its current list.
+        OnPropertyChanged(nameof(AuthMethodOptions));
+        OnPropertyChanged(nameof(HasAuthMethodChoice));
+
+        if (!ReferenceEquals(value, _authMethodChosenFor))
         {
-            // A Microsoft sign-in only belongs to a Microsoft account.
-            _pendingSignIn = null;
+            _authMethodChosenFor = value;
+            SelectedAuthMethod = DefaultAuthMethod(TemplateAuthMethods);
         }
+
+        OnPropertyChanged(nameof(SelectedAuthMethodOption));
+        OnPropertyChanged(nameof(TemplateHint));
+        OnPropertyChanged(nameof(HasTemplateHint));
 
         if (value.Template is { } template && !_applyingTemplate)
         {
@@ -93,13 +135,33 @@ public partial class AccountsViewModel : ObservableObject
         }
     }
 
-    private void OnAuthMethodChanged()
+    /// <summary>The provider's preferred method that works with this build, else its first one.</summary>
+    private AccountAuthMethod DefaultAuthMethod(IReadOnlyList<AccountAuthMethod> methods)
     {
-        OnPropertyChanged(nameof(SelectedAuthMethod));
+        foreach (var method in methods)
+        {
+            if (_credentials.IsAvailable(method))
+            {
+                return method;
+            }
+        }
+
+        return methods[0];
+    }
+
+    partial void OnSelectedAuthMethodChanged(AccountAuthMethod value)
+    {
+        // A sign-in belongs to the provider it was made with.
+        _pendingSignIn = null;
+
+        OnPropertyChanged(nameof(SelectedAuthMethodOption));
         OnPropertyChanged(nameof(IsOAuth));
         OnPropertyChanged(nameof(IsPasswordAuth));
         OnPropertyChanged(nameof(ShowKeepPasswordHint));
+        OnPropertyChanged(nameof(IsOAuthAvailable));
+        OnPropertyChanged(nameof(TemplateHint));
         OnSignInStateChanged();
+        SignInCommand.NotifyCanExecuteChanged();
     }
 
     private void OnSignInStateChanged()
@@ -151,8 +213,8 @@ public partial class AccountsViewModel : ObservableObject
     public bool IsEditing => EditingAccountId is not null;
 
     public string FormTitle => IsEditing
-        ? Localization.Strings.Get("accounts.saveChanges")
-        : Localization.Strings.Get("accounts.add");
+        ? Strings.Get("accounts.saveChanges")
+        : Strings.Get("accounts.add");
 
     partial void OnEditingAccountIdChanged(Guid? value)
     {
@@ -189,7 +251,7 @@ public partial class AccountsViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(Host) || string.IsNullOrWhiteSpace(Username))
         {
-            ConnectionStatus = Localization.Strings.Get(IsOAuth ? "accounts.signInFirst" : "accounts.enterHostUser");
+            ConnectionStatus = IsOAuth ? Strings.Get("accounts.signInFirst", ProviderName) : Strings.Get("accounts.enterHostUser");
             return;
         }
 
@@ -201,7 +263,7 @@ public partial class AccountsViewModel : ObservableObject
 
         if (IsOAuth && _pendingSignIn is null)
         {
-            ConnectionStatus = Localization.Strings.Get("accounts.signInFirst");
+            ConnectionStatus = Strings.Get("accounts.signInFirst", ProviderName);
             return;
         }
 
@@ -230,7 +292,7 @@ public partial class AccountsViewModel : ObservableObject
     {
         try
         {
-            if (account.AuthMethod == AccountAuthMethod.MicrosoftOAuth2 && _pendingSignIn is { } signIn)
+            if (account.AuthMethod != AccountAuthMethod.Password && _pendingSignIn is { } signIn)
             {
                 _credentials.SaveSignIn(account, signIn);
             }
@@ -243,7 +305,7 @@ public partial class AccountsViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ConnectionStatus = Localization.Strings.Get("accounts.signInFailed", ex.Message);
+            ConnectionStatus = Strings.Get("accounts.saveFailed", ex.Message);
             return false;
         }
     }
@@ -258,6 +320,13 @@ public partial class AccountsViewModel : ObservableObject
         Username = account.Username;
         Password = string.Empty;
         ConnectionStatus = string.Empty;
+
+        // Host/port picked the template and its default method; restore the account's own.
+        if (TemplateAuthMethods.Contains(account.AuthMethod))
+        {
+            SelectedAuthMethod = account.AuthMethod;
+        }
+
         OnSignInStateChanged();
     }
 
@@ -267,24 +336,34 @@ public partial class AccountsViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(IsOAuthAvailable), IncludeCancelCommand = true)]
     private async Task SignInAsync(CancellationToken cancellationToken)
     {
-        ConnectionStatus = Localization.Strings.Get("accounts.signingIn");
+        var method = SelectedAuthMethod;
+        var providerName = ProviderName;
+        if (_credentials.GetOAuthOptions(method) is not { IsConfigured: true } options)
+        {
+            ConnectionStatus = CredentialErrors.NotConfigured(method);
+            return;
+        }
+
+        ConnectionStatus = Strings.Get("accounts.signingIn");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(SignInTimeout);
 
         try
         {
-            var page = new BrowserPageText(
-                "MailBridge",
-                Localization.Strings.Get("oauth.pageSuccess"),
-                Localization.Strings.Get("oauth.pageFailure"));
+            var page = new BrowserPageText("MailBridge", Strings.Get("oauth.pageSuccess"), Strings.Get("oauth.pageFailure"));
             var loginHint = string.IsNullOrWhiteSpace(Username) ? null : Username.Trim();
 
-            var tokens = await _signInFlow.SignInAsync(
-                _credentials.MicrosoftOptions, OAuthConfiguration.OpenInBrowserAsync, page, loginHint, timeout.Token);
+            var tokens = await _signInFlow.SignInAsync(options, OAuthConfiguration.OpenInBrowserAsync, page, loginHint, timeout.Token);
+
+            if (method != SelectedAuthMethod)
+            {
+                // The user switched the sign-in method while the browser was open.
+                return;
+            }
 
             if (string.IsNullOrEmpty(tokens.RefreshToken))
             {
-                ConnectionStatus = Localization.Strings.Get("accounts.signInFailed", Localization.Strings.Get("accounts.noRefreshToken"));
+                ConnectionStatus = Strings.Get("accounts.signInFailed", providerName, Strings.Get("accounts.noRefreshToken", providerName));
                 return;
             }
 
@@ -294,15 +373,15 @@ public partial class AccountsViewModel : ObservableObject
                 Username = signedInAs;
             }
 
-            ConnectionStatus = Localization.Strings.Get(IsEditing ? "accounts.signedInEdit" : "accounts.signedIn", tokens.Username ?? Username);
+            ConnectionStatus = Strings.Get(IsEditing ? "accounts.signedInEdit" : "accounts.signedIn", tokens.Username ?? Username);
         }
         catch (OperationCanceledException)
         {
-            ConnectionStatus = Localization.Strings.Get(cancellationToken.IsCancellationRequested ? "accounts.signInCancelled" : "accounts.signInTimedOut");
+            ConnectionStatus = Strings.Get(cancellationToken.IsCancellationRequested ? "accounts.signInCancelled" : "accounts.signInTimedOut");
         }
         catch (Exception ex)
         {
-            ConnectionStatus = Localization.Strings.Get("accounts.signInFailed", ex.Message);
+            ConnectionStatus = Strings.Get("accounts.signInFailed", providerName, ex.Message);
         }
         finally
         {
@@ -315,7 +394,7 @@ public partial class AccountsViewModel : ObservableObject
     {
         if (string.IsNullOrWhiteSpace(Host) || string.IsNullOrWhiteSpace(Username))
         {
-            ConnectionStatus = Localization.Strings.Get(IsOAuth ? "accounts.signInFirst" : "accounts.enterHostUser");
+            ConnectionStatus = IsOAuth ? Strings.Get("accounts.signInFirst", ProviderName) : Strings.Get("accounts.enterHostUser");
             return;
         }
 
@@ -337,7 +416,7 @@ public partial class AccountsViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ConnectionStatus = Localization.Strings.Get("accounts.connFailed", ex.Message);
+            ConnectionStatus = Strings.Get("accounts.connFailed", ex.Message);
             return;
         }
 
@@ -350,16 +429,16 @@ public partial class AccountsViewModel : ObservableObject
             AuthMethod = SelectedAuthMethod,
         };
 
-        ConnectionStatus = Localization.Strings.Get("accounts.connecting", Host, Port);
+        ConnectionStatus = Strings.Get("accounts.connecting", Host, Port);
         try
         {
             using var client = await _imapConnectionService.ConnectAsync(testAccount, credential);
             var folders = await _imapConnectionService.GetAllFoldersAsync(client);
-            ConnectionStatus = Localization.Strings.Get("accounts.connOk", Username, folders.Count);
+            ConnectionStatus = Strings.Get("accounts.connOk", Username, folders.Count);
         }
         catch (Exception ex)
         {
-            ConnectionStatus = Localization.Strings.Get("accounts.connFailed", ex.Message);
+            ConnectionStatus = Strings.Get("accounts.connFailed", ex.Message);
         }
     }
 
@@ -378,12 +457,12 @@ public partial class AccountsViewModel : ObservableObject
                 return ImapCredential.FromAccessToken(signIn.AccessToken);
             }
 
-            if (existing?.AuthMethod == AccountAuthMethod.MicrosoftOAuth2)
+            if (existing is not null && existing.AuthMethod == SelectedAuthMethod)
             {
                 return await _credentials.GetAsync(existing);
             }
 
-            ConnectionStatus = Localization.Strings.Get("accounts.signInFirst");
+            ConnectionStatus = Strings.Get("accounts.signInFirst", ProviderName);
             return null;
         }
 
@@ -398,7 +477,7 @@ public partial class AccountsViewModel : ObservableObject
             return ImapCredential.FromPassword(stored);
         }
 
-        ConnectionStatus = Localization.Strings.Get("accounts.noPasswordTyped");
+        ConnectionStatus = Strings.Get("accounts.noPasswordTyped");
         return null;
     }
 
@@ -412,14 +491,16 @@ public partial class AccountsViewModel : ObservableObject
         }
 
         var authMethod = SelectedAuthMethod;
-        var newSignIn = authMethod == AccountAuthMethod.MicrosoftOAuth2 ? _pendingSignIn : null;
+        var newSignIn = authMethod != AccountAuthMethod.Password ? _pendingSignIn : null;
         var newPassword = authMethod == AccountAuthMethod.Password && !string.IsNullOrEmpty(Password) ? Password : null;
         var methodChanged = account.AuthMethod != authMethod;
 
-        // A password cannot stand in for a Microsoft sign-in or vice versa.
+        // A password cannot stand in for a sign-in, nor one provider's sign-in for another's.
         if (methodChanged && newSignIn is null && newPassword is null)
         {
-            ConnectionStatus = Localization.Strings.Get(authMethod == AccountAuthMethod.Password ? "accounts.noPasswordTyped" : "accounts.signInFirst");
+            ConnectionStatus = authMethod == AccountAuthMethod.Password
+                ? Strings.Get("accounts.noPasswordTyped")
+                : Strings.Get("accounts.signInFirst", ProviderName);
             return;
         }
 

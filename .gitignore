@@ -24,5 +24,6 @@ TestResults/
 
 ## Local secrets / user data
 appsettings.local.json
+OAuth.local.props
 *.mailbridge-backup/
 *.credlock

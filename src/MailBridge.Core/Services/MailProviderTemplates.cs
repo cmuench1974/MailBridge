@@ -6,8 +6,8 @@ namespace MailBridge.Core.Services;
 /// <summary>
 /// IMAP presets for popular mail providers. All of them use implicit TLS, the
 /// only mode MailBridge connects with for accounts created in the UI. Outlook.com
-/// and Microsoft 365 only accept OAuth2, so their template switches the account
-/// to Microsoft sign-in (see <see cref="MailProviderTemplate.AuthMethod"/>).
+/// and Microsoft 365 only accept OAuth2; Gmail offers Google sign-in (OAuth2) and
+/// app passwords (see <see cref="MailProviderTemplate.AuthMethods"/>).
 /// </summary>
 public static class MailProviderTemplates
 {
@@ -19,12 +19,18 @@ public static class MailProviderTemplates
         new("eclipso", "mail.eclipso.de", MailProviderSetup.EnableImap),
         new("Fastmail", "imap.fastmail.com", MailProviderSetup.AppPassword),
         new("freenet", "mx.freenet.de", MailProviderSetup.None),
-        new("Gmail", "imap.gmail.com", MailProviderSetup.AppPassword),
+        new("Gmail", GoogleOAuth.ImapHost, MailProviderSetup.AppPassword)
+        {
+            AuthMethods = new[] { AccountAuthMethod.GoogleOAuth2, AccountAuthMethod.Password },
+        },
         new("GMX", "imap.gmx.net", MailProviderSetup.EnableImap),
         new("iCloud Mail", "imap.mail.me.com", MailProviderSetup.AppPassword),
         new("IONOS", "imap.ionos.de", MailProviderSetup.None),
         new("mailbox.org", "imap.mailbox.org", MailProviderSetup.None),
-        new("Outlook.com / Microsoft 365", MicrosoftOAuth.ImapHost, MailProviderSetup.MicrosoftOAuth2),
+        new("Outlook.com / Microsoft 365", MicrosoftOAuth.ImapHost, MailProviderSetup.None)
+        {
+            AuthMethods = new[] { AccountAuthMethod.MicrosoftOAuth2 },
+        },
         new("Posteo", "posteo.de", MailProviderSetup.None),
         new("Strato", "imap.strato.de", MailProviderSetup.None),
         new("T-Online", "secureimap.t-online.de", MailProviderSetup.AppPassword),

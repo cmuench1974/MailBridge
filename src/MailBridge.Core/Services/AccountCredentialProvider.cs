@@ -20,13 +20,17 @@ public enum CredentialUnavailableReason
 /// <summary>Thrown when an account cannot be signed in without the user doing something first.</summary>
 public sealed class CredentialUnavailableException : Exception
 {
-    public CredentialUnavailableException(CredentialUnavailableReason reason, string message, Exception? innerException = null)
+    public CredentialUnavailableException(CredentialUnavailableReason reason, AccountAuthMethod authMethod, string message, Exception? innerException = null)
         : base(message, innerException)
     {
         Reason = reason;
+        AuthMethod = authMethod;
     }
 
     public CredentialUnavailableReason Reason { get; }
+
+    /// <summary>The sign-in method of the account, e.g. to name the provider in messages.</summary>
+    public AccountAuthMethod AuthMethod { get; }
 }
 
 /// <summary>
@@ -41,33 +45,46 @@ public sealed class AccountCredentialProvider
 
     private readonly ICredentialStore _store;
     private readonly OAuthClient _oauthClient;
+    private readonly IReadOnlyDictionary<AccountAuthMethod, OAuthProviderOptions> _oauthProviders;
     private readonly TimeProvider _time;
     private readonly Dictionary<string, CachedAccessToken> _cache = new();
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
 
-    public AccountCredentialProvider(ICredentialStore store, OAuthClient oauthClient, OAuthProviderOptions microsoftOptions, TimeProvider? timeProvider = null)
+    public AccountCredentialProvider(
+        ICredentialStore store,
+        OAuthClient oauthClient,
+        IReadOnlyDictionary<AccountAuthMethod, OAuthProviderOptions> oauthProviders,
+        TimeProvider? timeProvider = null)
     {
         _store = store;
         _oauthClient = oauthClient;
-        MicrosoftOptions = microsoftOptions;
+        _oauthProviders = oauthProviders;
         _time = timeProvider ?? TimeProvider.System;
     }
 
-    public OAuthProviderOptions MicrosoftOptions { get; }
+    /// <summary>The OAuth2 provider behind an OAuth2 sign-in method; null for passwords.</summary>
+    public OAuthProviderOptions? GetOAuthOptions(AccountAuthMethod method) =>
+        _oauthProviders.TryGetValue(method, out var options) ? options : null;
+
+    /// <summary>Whether accounts with this method can sign in with this build (OAuth2 needs a client ID).</summary>
+    public bool IsAvailable(AccountAuthMethod method) =>
+        method == AccountAuthMethod.Password || GetOAuthOptions(method)?.IsConfigured == true;
 
     public async Task<ImapCredential> GetAsync(EmailAccount account, CancellationToken cancellationToken = default)
     {
         if (account.AuthMethod == AccountAuthMethod.Password)
         {
             var password = _store.TryGet(account.CredentialKey, account.Username)
-                           ?? throw new CredentialUnavailableException(CredentialUnavailableReason.MissingPassword, "No stored password found for this account.");
+                           ?? throw new CredentialUnavailableException(CredentialUnavailableReason.MissingPassword, account.AuthMethod,
+                               "No stored password found for this account.");
             return ImapCredential.FromPassword(password);
         }
 
-        if (!MicrosoftOptions.IsConfigured)
+        var options = GetOAuthOptions(account.AuthMethod);
+        if (options is not { IsConfigured: true })
         {
-            throw new CredentialUnavailableException(CredentialUnavailableReason.OAuthNotConfigured,
-                "Microsoft sign-in is not configured in this build (no OAuth2 client ID).");
+            throw new CredentialUnavailableException(CredentialUnavailableReason.OAuthNotConfigured, account.AuthMethod,
+                $"{options?.DisplayName ?? account.AuthMethod.ToString()} sign-in is not configured in this build (no OAuth2 client ID).");
         }
 
         var key = CacheKey(account);
@@ -86,16 +103,17 @@ public sealed class AccountCredentialProvider
             }
 
             var refreshToken = _store.TryGet(account.CredentialKey, account.Username)
-                               ?? throw SignInRequired("No stored Microsoft sign-in found for this account.");
+                               ?? throw SignInRequired(account, $"No stored {options.DisplayName} sign-in found for this account.");
 
             OAuthTokens tokens;
             try
             {
-                tokens = await _oauthClient.RefreshAsync(MicrosoftOptions, refreshToken, cancellationToken).ConfigureAwait(false);
+                tokens = await _oauthClient.RefreshAsync(options, refreshToken, cancellationToken).ConfigureAwait(false);
             }
             catch (OAuthException ex) when (ex.RequiresSignIn)
             {
-                throw SignInRequired("The Microsoft sign-in for this account has expired or was revoked. Sign in again on the Accounts page.", ex);
+                throw SignInRequired(account,
+                    $"The {options.DisplayName} sign-in for this account has expired or was revoked. Sign in again on the Accounts page.", ex);
             }
 
             if (tokens.RefreshToken is { } rotated && rotated != refreshToken)
@@ -156,8 +174,8 @@ public sealed class AccountCredentialProvider
 
     private static string CacheKey(EmailAccount account) => account.CredentialKey + "\n" + account.Username;
 
-    private static CredentialUnavailableException SignInRequired(string message, Exception? inner = null) =>
-        new(CredentialUnavailableReason.SignInRequired, message, inner);
+    private static CredentialUnavailableException SignInRequired(EmailAccount account, string message, Exception? inner = null) =>
+        new(CredentialUnavailableReason.SignInRequired, account.AuthMethod, message, inner);
 
     private sealed record CachedAccessToken(string AccessToken, DateTimeOffset ExpiresAtUtc);
 }

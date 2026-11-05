@@ -77,12 +77,29 @@ internal sealed class ManualTimeProvider : TimeProvider
 
 internal static class TestOptions
 {
+    /// <summary>Microsoft-like provider: public client, scopes repeated in token requests.</summary>
     public static OAuthProviderOptions Provider(string clientId = "test-client") => new(
+        "TestProvider",
         clientId,
         new Uri("https://login.example.test/authorize"),
         new Uri("https://login.example.test/token"),
-        new[] { "imap", "offline_access" },
-        new Dictionary<string, string> { ["prompt"] = "select_account" });
+        new[] { "imap", "offline_access" })
+    {
+        ExtraAuthorizationParameters = new Dictionary<string, string> { ["prompt"] = "select_account" },
+    };
+
+    /// <summary>Google-like provider: client secret required, no scopes in token requests.</summary>
+    public static OAuthProviderOptions SecretProvider(string clientSecret = "test-secret") => new(
+        "SecretProvider",
+        "secret-client",
+        new Uri("https://secret.example.test/authorize"),
+        new Uri("https://secret.example.test/token"),
+        new[] { "mail" })
+    {
+        ClientSecret = clientSecret,
+        RequiresClientSecret = true,
+        IncludeScopeInTokenRequests = false,
+    };
 
     public static readonly BrowserPageText Page = new("MailBridge", "Signed in.", "Sign-in failed.");
 }

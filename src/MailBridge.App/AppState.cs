@@ -27,7 +27,7 @@ public static class AppState
 
     /// <summary>Passwords and OAuth2 access tokens for every connection, UI and scheduled backups alike.</summary>
     private static readonly AccountCredentialProvider Credentials =
-        new(CredentialStore, OAuthClientInstance, MicrosoftOAuth.CreateOptions(OAuthConfiguration.MicrosoftClientId));
+        new(CredentialStore, OAuthClientInstance, OAuthConfiguration.Providers);
 
     public static AccountStore AccountStore { get; } = new(Path.Combine(DataDirectory, "accounts.json"));
 

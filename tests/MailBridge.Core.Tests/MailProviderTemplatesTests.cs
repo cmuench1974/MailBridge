@@ -26,14 +26,16 @@ public class MailProviderTemplatesTests
     }
 
     [Fact]
-    public void MicrosoftTemplate_UsesOAuth2_AllOthersUsePasswords()
+    public void AuthMethods_MicrosoftOnlyOAuth2_GmailBothPreferringOAuth2_OthersPasswordOnly()
     {
         var microsoft = MailProviderTemplates.Find("outlook.office365.com", 993);
+        var gmail = MailProviderTemplates.Find("imap.gmail.com", 993);
 
-        Assert.Equal(MailProviderSetup.MicrosoftOAuth2, microsoft?.Setup);
-        Assert.Equal(AccountAuthMethod.MicrosoftOAuth2, microsoft?.AuthMethod);
-        Assert.All(MailProviderTemplates.All.Where(t => t != microsoft),
-            t => Assert.Equal(AccountAuthMethod.Password, t.AuthMethod));
+        Assert.Equal(new[] { AccountAuthMethod.MicrosoftOAuth2 }, microsoft?.AuthMethods);
+        Assert.Equal(new[] { AccountAuthMethod.GoogleOAuth2, AccountAuthMethod.Password }, gmail?.AuthMethods);
+        Assert.Equal(MailProviderSetup.AppPassword, gmail?.Setup); // still the hint for the app-password route
+        Assert.All(MailProviderTemplates.All.Where(t => t != microsoft && t != gmail),
+            t => Assert.Equal(new[] { AccountAuthMethod.Password }, t.AuthMethods));
     }
 
     [Fact]

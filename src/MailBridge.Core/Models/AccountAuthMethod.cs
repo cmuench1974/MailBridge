@@ -15,4 +15,7 @@ public enum AccountAuthMethod
     /// holds the refresh token, IMAP authenticates with a short-lived access token (XOAUTH2).
     /// </summary>
     MicrosoftOAuth2 = 1,
+
+    /// <summary>Google account (Gmail) via OAuth2, stored and used like <see cref="MicrosoftOAuth2"/>.</summary>
+    GoogleOAuth2 = 2,
 }

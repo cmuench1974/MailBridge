@@ -38,6 +38,11 @@
                         <ComboBox Header="{x:Bind L('accounts.template')}" ItemsSource="{x:Bind ViewModel.TemplateOptions}"
                                   SelectedItem="{x:Bind ViewModel.SelectedTemplate, Mode=TwoWay}"
                                   DisplayMemberPath="Name" HorizontalAlignment="Stretch" />
+                        <!-- Only for providers that accept more than one sign-in method (Gmail) -->
+                        <ComboBox Header="{x:Bind L('accounts.authMethod')}" ItemsSource="{x:Bind ViewModel.AuthMethodOptions, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedAuthMethodOption, Mode=TwoWay}"
+                                  DisplayMemberPath="Name" HorizontalAlignment="Stretch"
+                                  Visibility="{x:Bind ToVisibility(ViewModel.HasAuthMethodChoice), Mode=OneWay}" />
                         <TextBlock Text="{x:Bind ViewModel.TemplateHint, Mode=OneWay}"
                                    Style="{StaticResource HintTextStyle}" Margin="0,-6,0,0"
                                    Visibility="{x:Bind ToVisibility(ViewModel.HasTemplateHint), Mode=OneWay}" />

@@ -1,0 +1,12 @@
+<Project>
+  <!-- Copy this file to OAuth.local.props (git-ignored) and fill in the values of your own
+       OAuth2 app registrations, then rebuild. See README, "Google sign-in (OAuth2)". -->
+  <PropertyGroup>
+    <!-- Google Cloud OAuth client of type "Desktop app" -->
+    <GoogleOAuthClientId></GoogleOAuthClientId>
+    <GoogleOAuthClientSecret></GoogleOAuthClientSecret>
+
+    <!-- Optional: overrides MicrosoftOAuthClientId from Directory.Build.props -->
+    <!-- <MicrosoftOAuthClientId></MicrosoftOAuthClientId> -->
+  </PropertyGroup>
+</Project>

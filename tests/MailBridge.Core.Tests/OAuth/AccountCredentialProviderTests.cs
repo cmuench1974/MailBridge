@@ -19,8 +19,12 @@ public class AccountCredentialProviderTests
         AuthMethod = method,
     };
 
-    private AccountCredentialProvider Provider(StubTokenEndpoint endpoint, string clientId = "test-client") =>
-        new(_store, new OAuthClient(new HttpClient(endpoint), _time), TestOptions.Provider(clientId), _time);
+    private AccountCredentialProvider Provider(StubTokenEndpoint endpoint, string clientId = "test-client", string googleSecret = "test-secret") =>
+        new(_store, new OAuthClient(new HttpClient(endpoint), _time), new Dictionary<AccountAuthMethod, OAuthProviderOptions>
+        {
+            [AccountAuthMethod.MicrosoftOAuth2] = TestOptions.Provider(clientId),
+            [AccountAuthMethod.GoogleOAuth2] = TestOptions.SecretProvider(googleSecret),
+        }, _time);
 
     private static StubTokenEndpoint RotatingEndpoint()
     {
@@ -161,6 +165,66 @@ public class AccountCredentialProviderTests
             Provider(RotatingEndpoint(), clientId: "").GetAsync(Account(AccountAuthMethod.MicrosoftOAuth2)));
 
         Assert.Equal(CredentialUnavailableReason.OAuthNotConfigured, ex.Reason);
+        Assert.Equal(AccountAuthMethod.MicrosoftOAuth2, ex.AuthMethod);
+    }
+
+    [Fact]
+    public async Task GoogleAccount_RefreshesWithGoogleProvider()
+    {
+        var account = Account(AccountAuthMethod.GoogleOAuth2);
+        _store.Save(account.CredentialKey, account.Username, "g-rt");
+        var endpoint = new StubTokenEndpoint(_ => (HttpStatusCode.OK, StubTokenEndpoint.TokenJson("g-at"))); // Google keeps the refresh token
+        var provider = Provider(endpoint);
+
+        var credential = await provider.GetAsync(account);
+
+        Assert.Equal("g-at", credential.Secret);
+        var form = Assert.Single(endpoint.Requests);
+        Assert.Equal("secret-client", form["client_id"]);
+        Assert.Equal("test-secret", form["client_secret"]);
+        Assert.Equal("g-rt", _store.TryGet(account.CredentialKey, account.Username));
+    }
+
+    [Fact]
+    public async Task GoogleAccount_WithoutClientSecret_ReportsNotConfigured()
+    {
+        var account = Account(AccountAuthMethod.GoogleOAuth2);
+        _store.Save(account.CredentialKey, account.Username, "g-rt");
+        var endpoint = RotatingEndpoint();
+
+        var ex = await Assert.ThrowsAsync<CredentialUnavailableException>(() => Provider(endpoint, googleSecret: "").GetAsync(account));
+
+        Assert.Equal(CredentialUnavailableReason.OAuthNotConfigured, ex.Reason);
+        Assert.Equal(AccountAuthMethod.GoogleOAuth2, ex.AuthMethod);
+        Assert.Contains("SecretProvider", ex.Message);
+        Assert.Empty(endpoint.Requests);
+    }
+
+    [Fact]
+    public async Task OAuthAccount_OfUnregisteredProvider_ReportsNotConfigured()
+    {
+        var provider = new AccountCredentialProvider(_store, new OAuthClient(new HttpClient(RotatingEndpoint())),
+            new Dictionary<AccountAuthMethod, OAuthProviderOptions>(), _time);
+
+        var ex = await Assert.ThrowsAsync<CredentialUnavailableException>(() => provider.GetAsync(Account(AccountAuthMethod.GoogleOAuth2)));
+
+        Assert.Equal(CredentialUnavailableReason.OAuthNotConfigured, ex.Reason);
+        Assert.False(provider.IsAvailable(AccountAuthMethod.GoogleOAuth2));
+        Assert.True(provider.IsAvailable(AccountAuthMethod.Password));
+    }
+
+    [Fact]
+    public async Task RevokedSignIn_NamesTheProvider()
+    {
+        var account = Account(AccountAuthMethod.GoogleOAuth2);
+        _store.Save(account.CredentialKey, account.Username, "g-rt");
+        var provider = Provider(new StubTokenEndpoint(_ => (HttpStatusCode.BadRequest, "{\"error\":\"invalid_grant\",\"error_description\":\"Token has been expired or revoked.\"}")));
+
+        var ex = await Assert.ThrowsAsync<CredentialUnavailableException>(() => provider.GetAsync(account));
+
+        Assert.Equal(CredentialUnavailableReason.SignInRequired, ex.Reason);
+        Assert.Equal(AccountAuthMethod.GoogleOAuth2, ex.AuthMethod);
+        Assert.Contains("SecretProvider sign-in", ex.Message);
     }
 
     [Fact]

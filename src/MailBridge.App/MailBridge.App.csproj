@@ -25,8 +25,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Read at runtime by Security\OAuthConfiguration (value comes from Directory.Build.props). -->
+    <!-- Read at runtime by Security\OAuthConfiguration (values come from Directory.Build.props /
+         OAuth.local.props). A desktop app's Google client secret is not confidential (RFC 8252). -->
     <AssemblyMetadata Include="MicrosoftOAuthClientId" Value="$(MicrosoftOAuthClientId)" />
+    <AssemblyMetadata Include="GoogleOAuthClientId" Value="$(GoogleOAuthClientId)" />
+    <AssemblyMetadata Include="GoogleOAuthClientSecret" Value="$(GoogleOAuthClientSecret)" />
   </ItemGroup>
 
   <ItemGroup>

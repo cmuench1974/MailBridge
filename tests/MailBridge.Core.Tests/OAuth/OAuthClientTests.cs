@@ -61,6 +61,7 @@ public class OAuthClientTests
         Assert.Equal("the-verifier", form["code_verifier"]);
         Assert.Equal("http://localhost:5000", form["redirect_uri"]);
         Assert.Equal("test-client", form["client_id"]);
+        Assert.Equal("imap offline_access", form["scope"]);
         Assert.False(form.ContainsKey("client_secret"));
 
         Assert.Equal("at-1", tokens.AccessToken);
@@ -68,6 +69,48 @@ public class OAuthClientTests
         Assert.Equal(time.Now.AddSeconds(3599), tokens.ExpiresAtUtc);
         Assert.Equal("me@outlook.com", tokens.Username); // email wins over a phone-number preferred_username
         Assert.DoesNotContain("at-1", tokens.ToString());
+    }
+
+    [Fact]
+    public async Task TokenRequests_OfSecretProvider_SendSecretButNoScope()
+    {
+        var endpoint = new StubTokenEndpoint(_ => (HttpStatusCode.OK, StubTokenEndpoint.TokenJson("at", "rt")));
+        var client = new OAuthClient(new HttpClient(endpoint));
+
+        await client.RedeemCodeAsync(TestOptions.SecretProvider(), "code", "http://localhost:5000", "verifier");
+        await client.RefreshAsync(TestOptions.SecretProvider(), "rt");
+
+        Assert.Equal(2, endpoint.Requests.Count);
+        Assert.All(endpoint.Requests, form =>
+        {
+            Assert.Equal("secret-client", form["client_id"]);
+            Assert.Equal("test-secret", form["client_secret"]);
+            Assert.False(form.ContainsKey("scope"));
+        });
+    }
+
+    [Fact]
+    public void Providers_AreConfiguredOnlyWithEverythingTheyRequire()
+    {
+        Assert.True(MicrosoftOAuth.CreateOptions("ms-client").IsConfigured);
+        Assert.False(MicrosoftOAuth.CreateOptions(" ").IsConfigured);
+        Assert.True(GoogleOAuth.CreateOptions("g-client", "g-secret").IsConfigured);
+        Assert.False(GoogleOAuth.CreateOptions("g-client", "").IsConfigured); // Google rejects desktop clients without secret
+        Assert.False(GoogleOAuth.CreateOptions("", "g-secret").IsConfigured);
+    }
+
+    [Fact]
+    public void GoogleAuthorizationUri_RequestsOfflineAccessWithConsent()
+    {
+        var uri = new OAuthClient(new HttpClient()).BuildAuthorizationUri(
+            GoogleOAuth.CreateOptions("g-client", "g-secret"), "http://localhost:5000", "state", "challenge");
+
+        Assert.StartsWith("https://accounts.google.com/o/oauth2/v2/auth?", uri.AbsoluteUri);
+        var query = HttpUtility.ParseQueryString(uri.Query);
+        Assert.Equal("offline", query["access_type"]);
+        Assert.Equal("consent select_account", query["prompt"]);
+        Assert.Equal("https://mail.google.com/ openid email", query["scope"]);
+        Assert.Null(query["client_secret"]); // the secret only goes to the token endpoint
     }
 
     [Theory]
