@@ -1,0 +1,93 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <!-- Never change the UpgradeCode: it is how Windows Installer recognises older versions. -->
+  <Package Name="MailBridge"
+           Manufacturer="MailBridge"
+           Version="$(Version)"
+           UpgradeCode="E72BFBA9-4252-41A1-BAFA-98B6AB68FE25"
+           Language="1031"
+           Codepage="1252"
+           Scope="perMachine"
+           Compressed="yes">
+
+    <MajorUpgrade DowngradeErrorMessage="Eine neuere Version von MailBridge ist bereits installiert." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="AppIcon" SourceFile="..\src\MailBridge.App\Assets\AppIcon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPCOMMENTS" Value="IMAP-Postfächer sichern, wiederherstellen und zu einem anderen Anbieter umziehen." />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="MailBridge" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="MailBridge" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+
+    <!-- Close a running MailBridge (window or headless scheduled backup) before its files are replaced
+         or removed; if it does not react within 5 seconds it is terminated. -->
+    <util:CloseApplication Id="CloseApp" Target="MailBridge.exe" CloseMessage="yes" TerminateProcess="1" Timeout="5" RebootPrompt="no" />
+
+    <!-- Scheduled backups are Task Scheduler entries named MailBridge_Backup_<id> that start
+         [INSTALLFOLDER]MailBridge.exe. On a real uninstall (not when an upgrade removes the old version)
+         delete the uninstalling user's entries so they do not keep firing at a missing program.
+         Runs as that user (Impersonate) because the entries belong to the user who created them;
+         failures are ignored so they can never block the uninstall. -->
+    <SetProperty Id="RemoveScheduledBackups"
+                 Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command &quot;Get-ScheduledTask -TaskPath '\' -TaskName 'MailBridge_Backup_*' -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false; exit 0&quot;"
+                 Before="RemoveScheduledBackups"
+                 Sequence="execute"
+                 Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+    <CustomAction Id="RemoveScheduledBackups" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixQuietExec"
+                  Execute="deferred" Impersonate="yes" Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="RemoveScheduledBackups" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+    </InstallExecuteSequence>
+
+    <!-- UI: Welcome → destination folder → install → finish (with "launch now") -->
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <WixVariable Id="WixUIDialogBmp" Value="assets\InstallerDialog.bmp" />
+    <WixVariable Id="WixUIBannerBmp" Value="assets\InstallerBanner.bmp" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="MailBridge jetzt starten" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WixShellExecTarget" Value="[#AppExe]" />
+    <CustomAction Id="LaunchApp" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixShellExec" Impersonate="yes" />
+    <UI>
+      <!-- No license page -->
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" Order="2" />
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApp"
+               Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+    </UI>
+  </Package>
+
+  <Fragment>
+    <!-- Accounts, schedules and settings live per user under %LOCALAPPDATA%\MailBridge, passwords in
+         the Windows Credential Manager; both are kept on uninstall. -->
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Component Id="MainExecutable">
+        <File Id="AppExe" Source="$(PackageSource)MailBridge.exe" KeyPath="yes" />
+      </Component>
+      <Files Include="$(PackageSource)**">
+        <Exclude Files="$(PackageSource)MailBridge.exe" />
+      </Files>
+    </ComponentGroup>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut" Guid="026EF4F8-D6EF-4BE3-AD08-60D75CFA4EE1">
+        <Shortcut Id="AppShortcut"
+                  Name="MailBridge"
+                  Description="IMAP-Postfächer sichern, wiederherstellen und umziehen"
+                  Target="[INSTALLFOLDER]MailBridge.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="AppIcon" />
+        <!-- Windows Installer rules (ICE38/ICE43) require an HKCU key path for shortcut components -->
+        <RegistryValue Root="HKCU" Key="Software\MailBridge" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+  </Fragment>
+</Wix>

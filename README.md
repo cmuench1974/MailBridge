@@ -50,3 +50,28 @@ dotnet build MailBridge.sln
 ```
 dotnet test tests/MailBridge.Core.Tests
 ```
+
+## Installer
+
+```powershell
+.\build.ps1                  # x64; -Runtime win-arm64 for ARM, -SkipMsi for the package only
+```
+
+Publishes the app self-contained (no installed .NET runtime or Windows App SDK needed) to
+`artifacts\win-x64\` and builds `artifacts\MailBridge-<version>-x64.msi` from it with WiX Toolset 5
+(restored via NuGet on the first build; the version comes from `Directory.Build.props`). The MSI
+installs for all users to `C:\Program Files\MailBridge` (administrator rights required), adds a
+Start menu shortcut, closes a running MailBridge before updating and offers "MailBridge jetzt
+starten" at the end. Newer versions replace older ones automatically (same `UpgradeCode`).
+
+Accounts, schedules and settings under `%LOCALAPPDATA%\MailBridge` and the passwords in the Windows
+Credential Manager are kept on uninstall. The uninstalling user's scheduled-backup tasks
+(`MailBridge_Backup_*` in the Task Scheduler) are removed, since they would otherwise keep starting a
+program that no longer exists; upgrades leave them in place.
+
+`installer\make-images.ps1` regenerates the installer dialog images from the app icon.
+
+## Branches
+
+- `main` – stable releases
+- `DEV` – ongoing development; stable states are merged into `main` when a new version is released

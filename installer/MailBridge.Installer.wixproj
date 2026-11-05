@@ -1,0 +1,20 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <!-- Builds the MSI from the published app. Run via build.ps1, not via the solution:
+       dotnet build installer -p:Platform=x64 -p:Version=<version> -p:PackageSource=<artifacts\win-x64\> -->
+  <PropertyGroup>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <InstallerPlatform>$(Platform)</InstallerPlatform>
+    <OutputName>MailBridge-$(Version)-$(Platform)</OutputName>
+    <Cultures>de-DE</Cultures>
+    <DefineConstants>Version=$(Version);PackageSource=$(PackageSource)</DefineConstants>
+    <!-- ICE03: some Windows App SDK DLLs carry unusual language lists in their version resources. -->
+    <SuppressIces>ICE03</SuppressIces>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+  </ItemGroup>
+
+</Project>
