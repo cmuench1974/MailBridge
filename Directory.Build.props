@@ -1,0 +1,19 @@
+<Project>
+  <!-- OAuth2 settings that must not be committed (Google client secret), from a git-ignored file.
+       Copy OAuth.local.props.example to OAuth.local.props and fill it in. The same properties can
+       also come from environment variables or -p: arguments. -->
+  <Import Project="$(MSBuildThisFileDirectory)OAuth.local.props" Condition="Exists('$(MSBuildThisFileDirectory)OAuth.local.props')" />
+
+  <PropertyGroup>
+    <!-- Single source of the app version: shown in the title bar and used for the MSI (build.ps1). -->
+    <Version>1.1.0</Version>
+    <Product>MailBridge</Product>
+    <Authors>MailBridge</Authors>
+    <!-- Application (client) ID of the Microsoft Entra app registration used for Outlook.com /
+         Microsoft 365 sign-in (OAuth2). Not a secret. Empty = Microsoft sign-in is unavailable.
+         See README, "Microsoft sign-in (OAuth2)". -->
+    <MicrosoftOAuthClientId Condition="'$(MicrosoftOAuthClientId)' == ''"></MicrosoftOAuthClientId>
+    <!-- GoogleOAuthClientId / GoogleOAuthClientSecret: set in OAuth.local.props, see README,
+         "Google sign-in (OAuth2)". Empty = Google sign-in is unavailable (Gmail app passwords still work). -->
+  </PropertyGroup>
+</Project>

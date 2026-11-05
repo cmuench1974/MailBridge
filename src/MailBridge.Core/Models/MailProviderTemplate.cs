@@ -1,6 +1,6 @@
 namespace MailBridge.Core.Models;
 
-/// <summary>What a user has to do at the provider before MailBridge can log in.</summary>
+/// <summary>What a user has to do at the provider before a password login works.</summary>
 public enum MailProviderSetup
 {
     /// <summary>Works with the normal account password.</summary>
@@ -14,4 +14,13 @@ public enum MailProviderSetup
 }
 
 /// <summary>Preset IMAP connection details for a mail provider.</summary>
-public sealed record MailProviderTemplate(string Name, string Host, MailProviderSetup Setup, int Port = 993);
+public sealed record MailProviderTemplate(string Name, string Host, MailProviderSetup Setup, int Port = 993)
+{
+    private static readonly AccountAuthMethod[] PasswordOnly = { AccountAuthMethod.Password };
+
+    /// <summary>
+    /// Sign-in methods the provider accepts, preferred first. <see cref="Setup"/> only applies to
+    /// <see cref="AccountAuthMethod.Password"/>.
+    /// </summary>
+    public IReadOnlyList<AccountAuthMethod> AuthMethods { get; init; } = PasswordOnly;
+}

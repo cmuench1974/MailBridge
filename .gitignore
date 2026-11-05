@@ -1,6 +1,7 @@
 ## .NET
 bin/
 obj/
+artifacts/
 *.user
 *.suo
 .vs/
@@ -23,5 +24,6 @@ TestResults/
 
 ## Local secrets / user data
 appsettings.local.json
+OAuth.local.props
 *.mailbridge-backup/
 *.credlock

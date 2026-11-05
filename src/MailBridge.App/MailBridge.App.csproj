@@ -5,6 +5,10 @@
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <RootNamespace>MailBridge.App</RootNamespace>
     <OutputType>WinExe</OutputType>
+    <AssemblyName>MailBridge</AssemblyName>
+    <!-- Without this the build does not embed app.manifest, so the app runs without PerMonitorV2
+         DPI awareness and Windows bitmap-stretches (blurs) it at display scaling above 100 %. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <UseWinUI>true</UseWinUI>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -18,6 +22,14 @@
 
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Read at runtime by Security\OAuthConfiguration (values come from Directory.Build.props /
+         OAuth.local.props). A desktop app's Google client secret is not confidential (RFC 8252). -->
+    <AssemblyMetadata Include="MicrosoftOAuthClientId" Value="$(MicrosoftOAuthClientId)" />
+    <AssemblyMetadata Include="GoogleOAuthClientId" Value="$(GoogleOAuthClientId)" />
+    <AssemblyMetadata Include="GoogleOAuthClientSecret" Value="$(GoogleOAuthClientSecret)" />
   </ItemGroup>
 
   <ItemGroup>

@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MailBridge.Core.Models;
-using MailBridge.Core.Security;
 using MailBridge.Core.Services;
 
 namespace MailBridge.App.ViewModels;
@@ -11,7 +10,7 @@ public partial class RestoreViewModel : ObservableObject
 {
     private readonly RestoreService _restoreService;
     private readonly CompressionService _compressionService;
-    private readonly ICredentialStore _credentialStore;
+    private readonly AccountCredentialProvider _credentials;
 
     [ObservableProperty]
     private string backupPath = string.Empty;
@@ -70,11 +69,11 @@ public partial class RestoreViewModel : ObservableObject
     /// </summary>
     public Func<RestoreConflict, Task<ConflictResolution>>? ConflictHandler { get; set; }
 
-    public RestoreViewModel(RestoreService restoreService, CompressionService compressionService, ICredentialStore credentialStore)
+    public RestoreViewModel(RestoreService restoreService, CompressionService compressionService, AccountCredentialProvider credentials)
     {
         _restoreService = restoreService;
         _compressionService = compressionService;
-        _credentialStore = credentialStore;
+        _credentials = credentials;
     }
 
     partial void OnSelectedBackupFolderChanged(SelectableFolder? value)
@@ -198,13 +197,6 @@ public partial class RestoreViewModel : ObservableObject
             return;
         }
 
-        var password = _credentialStore.TryGet(TargetAccount.CredentialKey, TargetAccount.Username);
-        if (password is null)
-        {
-            StatusText = Localization.Strings.Get("common.noPassword");
-            return;
-        }
-
         IsRunning = true;
         StatusText = Localization.Strings.Get("restore.preparing");
 
@@ -212,6 +204,7 @@ public partial class RestoreViewModel : ObservableObject
 
         try
         {
+            var credential = await _credentials.GetAsync(TargetAccount);
             var workingDir = EnsureWorkingDirectory();
             extractedTempDir = workingDir != BackupPath ? workingDir : null;
 
@@ -228,7 +221,7 @@ public partial class RestoreViewModel : ObservableObject
             var outcome = await _restoreService.RunRestoreAsync(
                 workingDir,
                 TargetAccount,
-                password,
+                credential,
                 filter,
                 conflict => ConflictHandler?.Invoke(conflict) ?? Task.FromResult(ConflictResolution.Skip),
                 selection: BuildSelection());
@@ -236,6 +229,10 @@ public partial class RestoreViewModel : ObservableObject
             StatusText = outcome.Aborted
                 ? Localization.Strings.Get("restore.aborted", outcome.Restored, outcome.Replaced, outcome.Skipped)
                 : Localization.Strings.Get("restore.done", outcome.Restored, outcome.Replaced, outcome.Skipped);
+        }
+        catch (CredentialUnavailableException ex)
+        {
+            StatusText = CredentialErrors.Describe(ex);
         }
         catch (Exception ex)
         {

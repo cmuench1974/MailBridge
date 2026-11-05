@@ -3,7 +3,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MailBridge.Core.Models;
 using MailKit;
-using MailBridge.Core.Security;
 using MailBridge.Core.Services;
 
 namespace MailBridge.App.ViewModels;
@@ -12,7 +11,7 @@ public partial class BackupViewModel : ObservableObject
 {
     private readonly BackupService _backupService;
     private readonly CompressionService _compressionService;
-    private readonly ICredentialStore _credentialStore;
+    private readonly AccountCredentialProvider _credentials;
     private readonly ImapConnectionService _imapConnectionService;
 
     [ObservableProperty]
@@ -59,11 +58,11 @@ public partial class BackupViewModel : ObservableObject
         }
     }
 
-    public BackupViewModel(BackupService backupService, CompressionService compressionService, ICredentialStore credentialStore, SettingsStore settingsStore, ImapConnectionService imapConnectionService)
+    public BackupViewModel(BackupService backupService, CompressionService compressionService, AccountCredentialProvider credentials, SettingsStore settingsStore, ImapConnectionService imapConnectionService)
     {
         _backupService = backupService;
         _compressionService = compressionService;
-        _credentialStore = credentialStore;
+        _credentials = credentials;
         _imapConnectionService = imapConnectionService;
 
         var settings = settingsStore.Load();
@@ -91,24 +90,18 @@ public partial class BackupViewModel : ObservableObject
             return;
         }
 
-        var password = _credentialStore.TryGet(SelectedAccount.CredentialKey, SelectedAccount.Username);
-        if (password is null)
-        {
-            StatusText = Localization.Strings.Get("common.noPassword");
-            return;
-        }
-
         IsLoadingFolders = true;
         StatusText = Localization.Strings.Get("backup.selLoading");
 
         try
         {
             var account = SelectedAccount;
+            var credential = await _credentials.GetAsync(account);
             ServerFolders.Clear();
             SelectedServerFolder = null;
             var folders = new List<SelectableFolder>();
 
-            using (var client = await _imapConnectionService.ConnectAsync(account, password))
+            using (var client = await _imapConnectionService.ConnectAsync(account, credential))
             {
                 foreach (var folder in await _imapConnectionService.GetAllFoldersAsync(client))
                 {
@@ -136,6 +129,10 @@ public partial class BackupViewModel : ObservableObject
             OnPropertyChanged(nameof(SelectionSummary));
             StatusText = Localization.Strings.Get("backup.selLoaded", folders.Count);
         }
+        catch (CredentialUnavailableException ex)
+        {
+            StatusText = CredentialErrors.Describe(ex);
+        }
         catch (Exception ex)
         {
             StatusText = Localization.Strings.Get("backup.failed", ex.Message);
@@ -153,15 +150,11 @@ public partial class BackupViewModel : ObservableObject
             return;
         }
 
-        var password = _credentialStore.TryGet(SelectedAccount.CredentialKey, SelectedAccount.Username);
-        if (password is null)
-        {
-            return;
-        }
-
         try
         {
-            using var client = await _imapConnectionService.ConnectAsync(SelectedAccount, password);
+            var account = SelectedAccount;
+            var credential = await _credentials.GetAsync(account);
+            using var client = await _imapConnectionService.ConnectAsync(account, credential);
             var folders = await _imapConnectionService.GetAllFoldersAsync(client);
             var imapFolder = folders.FirstOrDefault(f => f.FullName == folder.Name);
             if (imapFolder is null)
@@ -234,19 +227,13 @@ public partial class BackupViewModel : ObservableObject
             return;
         }
 
-        var password = _credentialStore.TryGet(SelectedAccount.CredentialKey, SelectedAccount.Username);
-        if (password is null)
-        {
-            StatusText = Localization.Strings.Get("common.noPassword");
-            return;
-        }
-
         IsRunning = true;
         StatusText = Localization.Strings.Get("backup.connecting");
         ProgressValue = 0;
 
         try
         {
+            var credential = await _credentials.GetAsync(SelectedAccount);
             var workDir = CompressToZip
                 ? Path.Combine(Path.GetTempPath(), "MailBridge", "staging_" + Guid.NewGuid().ToString("N"))
                 : DestinationDirectory;
@@ -256,7 +243,7 @@ public partial class BackupViewModel : ObservableObject
                 StatusText = $"{p.Folder}: {p.MessagesDone}/{p.MessagesTotal}";
             });
 
-            var manifest = await _backupService.RunBackupAsync(SelectedAccount, password, workDir, progress, selection: BuildSelection());
+            var manifest = await _backupService.RunBackupAsync(SelectedAccount, credential, workDir, progress, selection: BuildSelection());
 
             if (CompressToZip)
             {
@@ -269,6 +256,10 @@ public partial class BackupViewModel : ObservableObject
             {
                 StatusText = Localization.Strings.Get("backup.completeDir", manifest.TotalMessages, DestinationDirectory);
             }
+        }
+        catch (CredentialUnavailableException ex)
+        {
+            StatusText = CredentialErrors.Describe(ex);
         }
         catch (Exception ex)
         {

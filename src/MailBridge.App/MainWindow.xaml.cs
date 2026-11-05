@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Runtime.InteropServices;
 using MailBridge.App.Localization;
 using MailBridge.App.ViewModels;
 using MailBridge.App.Views;
@@ -12,6 +13,9 @@ public sealed partial class MainWindow : Window
 {
     private const int DefaultWidth = 1180;
     private const int DefaultHeight = 780;
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hWnd);
 
     public string L(string key) => Strings.Get(key);
 
@@ -82,12 +86,17 @@ public sealed partial class MainWindow : Window
             appWindow.SetIcon(iconPath);
         }
 
-        appWindow.Resize(new Windows.Graphics.SizeInt32(DefaultWidth, DefaultHeight));
-
-        var area = DisplayArea.Primary.WorkArea;
-        appWindow.Move(new Windows.Graphics.PointInt32(
-            area.X + Math.Max(0, (area.Width - DefaultWidth) / 2),
-            area.Y + Math.Max(0, (area.Height - DefaultHeight) / 2)));
+        // AppWindow works in physical pixels: scale the default size by the display scaling and
+        // clamp it to the work area of the monitor the window appears on.
+        var area = DisplayArea.GetFromWindowId(windowId, DisplayAreaFallback.Primary).WorkArea;
+        var scale = Math.Max(1, GetDpiForWindow(hwnd)) / 96.0;
+        var width = Math.Min((int)(DefaultWidth * scale), area.Width);
+        var height = Math.Min((int)(DefaultHeight * scale), area.Height);
+        appWindow.MoveAndResize(new Windows.Graphics.RectInt32(
+            area.X + (area.Width - width) / 2,
+            area.Y + (area.Height - height) / 2,
+            width,
+            height));
     }
 
     private void AppTitleBar_PaneToggleRequested(TitleBar sender, object args)
