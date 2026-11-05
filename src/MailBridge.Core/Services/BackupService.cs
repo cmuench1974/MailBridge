@@ -29,7 +29,7 @@ public sealed class BackupService
 
     public async Task<BackupManifest> RunBackupAsync(
         EmailAccount account,
-        string password,
+        ImapCredential credential,
         string destinationDirectory,
         IProgress<BackupProgress>? progress = null,
         CancellationToken cancellationToken = default,
@@ -43,7 +43,7 @@ public sealed class BackupService
             SourceUsername = account.Username,
         };
 
-        using var client = await _imap.ConnectAsync(account, password, cancellationToken).ConfigureAwait(false);
+        using var client = await _imap.ConnectAsync(account, credential, cancellationToken).ConfigureAwait(false);
         var folders = await _imap.GetAllFoldersAsync(client, cancellationToken).ConfigureAwait(false);
 
         foreach (var folder in folders)

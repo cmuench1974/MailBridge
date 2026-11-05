@@ -1,12 +1,13 @@
 using MailBridge.Core.Models;
+using MailBridge.Core.Security.OAuth;
 
 namespace MailBridge.Core.Services;
 
 /// <summary>
 /// IMAP presets for popular mail providers. All of them use implicit TLS, the
-/// only mode MailBridge connects with for accounts created in the UI. Providers
-/// that only accept OAuth2 (Outlook.com, Microsoft 365) are left out on purpose:
-/// a template would suggest a login that cannot succeed.
+/// only mode MailBridge connects with for accounts created in the UI. Outlook.com
+/// and Microsoft 365 only accept OAuth2, so their template switches the account
+/// to Microsoft sign-in (see <see cref="MailProviderTemplate.AuthMethod"/>).
 /// </summary>
 public static class MailProviderTemplates
 {
@@ -23,6 +24,7 @@ public static class MailProviderTemplates
         new("iCloud Mail", "imap.mail.me.com", MailProviderSetup.AppPassword),
         new("IONOS", "imap.ionos.de", MailProviderSetup.None),
         new("mailbox.org", "imap.mailbox.org", MailProviderSetup.None),
+        new("Outlook.com / Microsoft 365", MicrosoftOAuth.ImapHost, MailProviderSetup.MicrosoftOAuth2),
         new("Posteo", "posteo.de", MailProviderSetup.None),
         new("Strato", "imap.strato.de", MailProviderSetup.None),
         new("T-Online", "secureimap.t-online.de", MailProviderSetup.AppPassword),

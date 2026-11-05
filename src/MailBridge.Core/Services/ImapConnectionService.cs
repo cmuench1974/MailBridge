@@ -6,13 +6,13 @@ using MailKit.Security;
 namespace MailBridge.Core.Services;
 
 /// <summary>
-/// Opens and authenticates IMAP connections. v1 supports username +
-/// (app-)password only; OAuth2 (required by Outlook.com/Microsoft 365) is a
-/// follow-up once an app registration exists.
+/// Opens and authenticates IMAP connections, with a password or - for Outlook.com and
+/// Microsoft 365 - an OAuth2 access token (SASL XOAUTH2). The credential comes from
+/// <see cref="AccountCredentialProvider"/>.
 /// </summary>
 public sealed class ImapConnectionService
 {
-    public async Task<ImapClient> ConnectAsync(EmailAccount account, string password, CancellationToken cancellationToken = default)
+    public async Task<ImapClient> ConnectAsync(EmailAccount account, ImapCredential credential, CancellationToken cancellationToken = default)
     {
         var client = new ImapClient();
         try
@@ -21,7 +21,15 @@ public sealed class ImapConnectionService
                 account.UseSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls,
                 cancellationToken).ConfigureAwait(false);
 
-            await client.AuthenticateAsync(account.Username, password, cancellationToken).ConfigureAwait(false);
+            if (credential.IsOAuth2)
+            {
+                await client.AuthenticateAsync(new SaslMechanismOAuth2(account.Username, credential.Secret), cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await client.AuthenticateAsync(account.Username, credential.Secret, cancellationToken).ConfigureAwait(false);
+            }
+
             return client;
         }
         catch

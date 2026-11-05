@@ -25,6 +25,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Read at runtime by Security\OAuthConfiguration (value comes from Directory.Build.props). -->
+    <AssemblyMetadata Include="MicrosoftOAuthClientId" Value="$(MicrosoftOAuthClientId)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="Assets\AppIcon.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

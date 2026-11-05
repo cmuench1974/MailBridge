@@ -46,10 +46,32 @@
                         <TextBox Header="{x:Bind L('accounts.host')}" PlaceholderText="imap.example.com" Text="{x:Bind ViewModel.Host, Mode=TwoWay}" />
                         <NumberBox Header="{x:Bind L('accounts.port')}" Value="{x:Bind ViewModel.Port, Mode=TwoWay}" />
                         <TextBox Header="{x:Bind L('accounts.username')}" Text="{x:Bind ViewModel.Username, Mode=TwoWay}" />
-                        <PasswordBox Header="{x:Bind L('accounts.password')}" Password="{x:Bind ViewModel.Password, Mode=TwoWay}" />
+                        <PasswordBox Header="{x:Bind L('accounts.password')}" Password="{x:Bind ViewModel.Password, Mode=TwoWay}"
+                                     Visibility="{x:Bind ToVisibility(ViewModel.IsPasswordAuth), Mode=OneWay}" />
                         <TextBlock Text="{x:Bind L('accounts.keepPasswordHint')}"
                                    Style="{StaticResource HintTextStyle}" Margin="0,-6,0,0"
-                                   Visibility="{x:Bind ToVisibility(ViewModel.IsEditing), Mode=OneWay}" />
+                                   Visibility="{x:Bind ToVisibility(ViewModel.ShowKeepPasswordHint), Mode=OneWay}" />
+
+                        <!-- Microsoft sign-in (OAuth2) instead of a password -->
+                        <StackPanel Spacing="6" Visibility="{x:Bind ToVisibility(ViewModel.IsOAuth), Mode=OneWay}">
+                            <TextBlock Text="{x:Bind L('accounts.signInHeader')}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Command="{x:Bind ViewModel.SignInCommand}"
+                                        AutomationProperties.Name="{x:Bind ViewModel.SignInButtonText, Mode=OneWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE8D7;" FontSize="16" />
+                                        <TextBlock Text="{x:Bind ViewModel.SignInButtonText, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Content="{x:Bind L('common.cancel')}" Command="{x:Bind ViewModel.SignInCancelCommand}"
+                                        Visibility="{x:Bind ToVisibility(ViewModel.SignInCommand.IsRunning), Mode=OneWay}" />
+                                <ProgressRing IsActive="{x:Bind ViewModel.SignInCommand.IsRunning, Mode=OneWay}"
+                                              Visibility="{x:Bind ToVisibility(ViewModel.SignInCommand.IsRunning), Mode=OneWay}"
+                                              Width="24" Height="24" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="{x:Bind ViewModel.OAuthHint, Mode=OneWay}" Style="{StaticResource HintTextStyle}"
+                                       Visibility="{x:Bind ToVisibility(ViewModel.HasOAuthHint), Mode=OneWay}" />
+                        </StackPanel>
 
                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                             <Button Content="{x:Bind ViewModel.FormTitle, Mode=OneWay}" Command="{x:Bind ViewModel.SaveAccountCommand}" Style="{StaticResource AccentButtonStyle}" />

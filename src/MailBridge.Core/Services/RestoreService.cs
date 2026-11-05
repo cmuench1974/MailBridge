@@ -49,7 +49,7 @@ public sealed class RestoreService
     public async Task<RestoreOutcome> RunRestoreAsync(
         string backupDirectory,
         EmailAccount targetAccount,
-        string password,
+        ImapCredential credential,
         RestoreFilter filter,
         Func<RestoreConflict, Task<ConflictResolution>> onConflict,
         CancellationToken cancellationToken = default,
@@ -58,7 +58,7 @@ public sealed class RestoreService
         var outcome = new RestoreOutcome();
         var manifest = await LoadManifestAsync(backupDirectory, cancellationToken).ConfigureAwait(false);
 
-        using var client = await _imap.ConnectAsync(targetAccount, password, cancellationToken).ConfigureAwait(false);
+        using var client = await _imap.ConnectAsync(targetAccount, credential, cancellationToken).ConfigureAwait(false);
 
         ConflictResolution? stickyDecision = null;
 

@@ -4,5 +4,9 @@
     <Version>1.0.0</Version>
     <Product>MailBridge</Product>
     <Authors>MailBridge</Authors>
+    <!-- Application (client) ID of the Microsoft Entra app registration used for Outlook.com /
+         Microsoft 365 sign-in (OAuth2). Not a secret. Empty = Microsoft sign-in is unavailable.
+         See README, "Microsoft sign-in (OAuth2)". -->
+    <MicrosoftOAuthClientId></MicrosoftOAuthClientId>
   </PropertyGroup>
 </Project>

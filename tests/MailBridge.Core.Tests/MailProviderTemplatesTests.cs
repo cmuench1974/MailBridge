@@ -26,6 +26,17 @@ public class MailProviderTemplatesTests
     }
 
     [Fact]
+    public void MicrosoftTemplate_UsesOAuth2_AllOthersUsePasswords()
+    {
+        var microsoft = MailProviderTemplates.Find("outlook.office365.com", 993);
+
+        Assert.Equal(MailProviderSetup.MicrosoftOAuth2, microsoft?.Setup);
+        Assert.Equal(AccountAuthMethod.MicrosoftOAuth2, microsoft?.AuthMethod);
+        Assert.All(MailProviderTemplates.All.Where(t => t != microsoft),
+            t => Assert.Equal(AccountAuthMethod.Password, t.AuthMethod));
+    }
+
+    [Fact]
     public void Find_IgnoresCaseAndSurroundingWhitespace()
     {
         var template = MailProviderTemplates.Find("  IMAP.GMX.NET ", 993);
