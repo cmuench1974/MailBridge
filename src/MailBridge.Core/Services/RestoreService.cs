@@ -87,8 +87,7 @@ public sealed class RestoreService
                 continue;
             }
 
-            var targetFolder = await client.GetFolderAsync(folderName, cancellationToken).ConfigureAwait(false)
-                               ?? client.Inbox;
+            var targetFolder = await _imap.GetOrCreateFolderAsync(client, folderName, manifest.FolderSeparator, cancellationToken).ConfigureAwait(false);
             await targetFolder.OpenAsync(FolderAccess.ReadWrite, cancellationToken).ConfigureAwait(false);
 
             var existingSummaries = await targetFolder.FetchAsync(
@@ -201,8 +200,7 @@ public sealed class RestoreService
 
     private static async Task<List<EmailRecord>> LoadFolderIndexAsync(string backupDirectory, string folderName, CancellationToken cancellationToken)
     {
-        var safe = folderName.Split('/', '\\');
-        var indexPath = Path.Combine(Path.Combine(backupDirectory, Path.Combine(safe)), "index.json");
+        var indexPath = Path.Combine(backupDirectory, BackupService.FolderDirectory(folderName), "index.json");
         if (!File.Exists(indexPath))
         {
             return new List<EmailRecord>();

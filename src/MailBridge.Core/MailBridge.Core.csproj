@@ -14,4 +14,8 @@
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="MailBridge.Core.Tests" />
+  </ItemGroup>
+
 </Project>

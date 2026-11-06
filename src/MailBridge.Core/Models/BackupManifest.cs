@@ -17,6 +17,12 @@ public sealed class BackupManifest
 
     public List<string> Folders { get; set; } = new();
 
+    /// <summary>
+    /// Hierarchy separator of the source account's folder names ("/" or "."), so a restore can
+    /// rebuild subfolders on a server that uses another one. Null in older backups.
+    /// </summary>
+    public char? FolderSeparator { get; set; }
+
     public int TotalMessages { get; set; }
 
     public long TotalSizeInBytes { get; set; }
