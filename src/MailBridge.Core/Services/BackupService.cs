@@ -77,7 +77,7 @@ public sealed class BackupService
                 }
             }
 
-            var safeFolderName = SanitizeForPath(folder.FullName);
+            var safeFolderName = FolderDirectory(folder.FullName);
             var folderDir = Path.Combine(destinationDirectory, safeFolderName);
             Directory.CreateDirectory(folderDir);
 
@@ -123,6 +123,11 @@ public sealed class BackupService
             }
 
             manifest.Folders.Add(folder.FullName);
+            if (folder.DirectorySeparator != '\0')
+            {
+                manifest.FolderSeparator ??= folder.DirectorySeparator;
+            }
+
             manifest.TotalMessages += records.Count;
             manifest.TotalSizeInBytes += records.Sum(r => r.SizeInBytes);
 
@@ -138,10 +143,17 @@ public sealed class BackupService
         return manifest;
     }
 
-    private static string SanitizeForPath(string folderFullName)
+    /// <summary>
+    /// Relative directory of a folder inside a backup: one directory level per "/" or "\" in the
+    /// name, characters Windows does not allow replaced by "_", and "." or ".." levels defused so
+    /// a folder name can never point outside the backup. Backup and restore must agree on it.
+    /// </summary>
+    internal static string FolderDirectory(string folderFullName)
     {
         var invalid = Path.GetInvalidFileNameChars();
-        var parts = folderFullName.Split('/', '\\').Select(p => new string(p.Select(c => invalid.Contains(c) ? '_' : c).ToArray()));
+        var parts = folderFullName.Split('/', '\\')
+            .Select(p => new string(p.Select(c => invalid.Contains(c) ? '_' : c).ToArray()))
+            .Select(p => p.Length > 0 && p.All(c => c == '.') ? new string('_', p.Length) : p);
         return Path.Combine(parts.ToArray());
     }
 

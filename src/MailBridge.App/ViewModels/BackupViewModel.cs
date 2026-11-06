@@ -73,6 +73,17 @@ public partial class BackupViewModel : ObservableObject
         CompressToZip = settings.DefaultCompressToZip;
     }
 
+    /// <summary>
+    /// A folder selection belongs to one account: kept across a switch, it would limit the new
+    /// account's backup to the folders the old one happened to have.
+    /// </summary>
+    partial void OnSelectedAccountChanged(EmailAccount? value)
+    {
+        SelectedServerFolder = null;
+        ServerFolders.Clear();
+        OnPropertyChanged(nameof(SelectionSummary));
+    }
+
     partial void OnSelectedServerFolderChanged(SelectableFolder? value)
     {
         if (value is not null && !value.MessagesLoaded)
@@ -105,19 +116,16 @@ public partial class BackupViewModel : ObservableObject
             {
                 foreach (var folder in await _imapConnectionService.GetAllFoldersAsync(client))
                 {
-                    var count = 0;
-                    try
-                    {
-                        await folder.OpenAsync(MailKit.FolderAccess.ReadOnly);
-                        count = folder.Count;
-                    }
-                    finally
-                    {
-                        await folder.CloseAsync(false);
-                    }
-
-                    folders.Add(new SelectableFolder { Name = folder.FullName, TotalMessages = count });
+                    // STATUS counts without selecting the folder - cheaper with many (sub)folders.
+                    await folder.StatusAsync(MailKit.StatusItems.Count);
+                    folders.Add(new SelectableFolder { Name = folder.FullName, TotalMessages = folder.Count });
                 }
+            }
+
+            if (!ReferenceEquals(account, SelectedAccount))
+            {
+                StatusText = string.Empty; // the account was switched while loading; this list would not fit
+                return;
             }
 
             foreach (var f in folders)
@@ -155,13 +163,7 @@ public partial class BackupViewModel : ObservableObject
             var account = SelectedAccount;
             var credential = await _credentials.GetAsync(account);
             using var client = await _imapConnectionService.ConnectAsync(account, credential);
-            var folders = await _imapConnectionService.GetAllFoldersAsync(client);
-            var imapFolder = folders.FirstOrDefault(f => f.FullName == folder.Name);
-            if (imapFolder is null)
-            {
-                return;
-            }
-
+            var imapFolder = await client.GetFolderAsync(folder.Name);
             await imapFolder.OpenAsync(MailKit.FolderAccess.ReadOnly);
             var uids = await imapFolder.SearchAsync(MailKit.Search.SearchQuery.All);
             var summaries = await imapFolder.FetchAsync(
