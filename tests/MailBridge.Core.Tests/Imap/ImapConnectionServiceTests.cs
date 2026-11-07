@@ -70,6 +70,10 @@ public class ImapConnectionServiceTests
         Assert.Contains("Archiv/2023", server.FolderNames);
         Assert.Contains("Archiv/2023/Q1", server.FolderNames);
         Assert.Equal(2, server.Commands.Count(c => c.StartsWith("CREATE", StringComparison.Ordinal))); // "Archiv" already existed
+
+        // Otherwise Thunderbird and most webmail would not show the new folders.
+        Assert.Contains("Archiv/2023", server.SubscribedFolderNames);
+        Assert.Contains("Archiv/2023/Q1", server.SubscribedFolderNames);
     }
 
     [Fact]
@@ -100,5 +104,52 @@ public class ImapConnectionServiceTests
 
         Assert.Equal("Archiv/2023", folder.FullName);
         Assert.Contains("Archiv", server.FolderNames);
+    }
+
+    [Fact]
+    public async Task GetOrCreateSubfolder_RecreatesBackupTreeBelowChosenFolder()
+    {
+        // Backup of a "." server restored below a folder the user picked on a "/" server.
+        await using var server = new FakeImapServer('/', "", new FakeFolder("Altes Konto"));
+        using var client = await server.ConnectAsync();
+        var parent = await client.GetFolderAsync("Altes Konto");
+
+        var inbox = await _service.GetOrCreateSubfolderAsync(parent, "INBOX", '.');
+        var nested = await _service.GetOrCreateSubfolderAsync(parent, "INBOX.Rechnungen", '.');
+
+        Assert.Equal("Altes Konto/INBOX", inbox.FullName);
+        Assert.Equal("Altes Konto/INBOX/Rechnungen", nested.FullName);
+        Assert.Equal(2, server.Commands.Count(c => c.StartsWith("CREATE", StringComparison.Ordinal)));
+        Assert.Contains("Altes Konto/INBOX", server.SubscribedFolderNames);
+        Assert.Contains("Altes Konto/INBOX/Rechnungen", server.SubscribedFolderNames);
+    }
+
+    [Fact]
+    public async Task EnsureSubscribed_SubscribesAnExistingUnsubscribedFolder()
+    {
+        // E.g. a folder created by an earlier restore that did not subscribe yet.
+        await using var server = new FakeImapServer('/', "", new FakeFolder("Test"), new FakeFolder("Test/INBOX", Subscribed: false));
+        using var client = await server.ConnectAsync();
+        var folder = await client.GetFolderAsync("Test/INBOX");
+
+        await _service.EnsureSubscribedAsync(folder);
+
+        Assert.Contains("Test/INBOX", server.SubscribedFolderNames);
+    }
+
+    [Fact]
+    public async Task GetOrCreateSubfolder_ReusesExistingSubfolders()
+    {
+        await using var server = new FakeImapServer('/', "",
+            new FakeFolder("Altes Konto"),
+            new FakeFolder("Altes Konto/Archiv"),
+            new FakeFolder("Altes Konto/Archiv/2023"));
+        using var client = await server.ConnectAsync();
+        var parent = await client.GetFolderAsync("Altes Konto");
+
+        var folder = await _service.GetOrCreateSubfolderAsync(parent, "Archiv/2023", separator: null);
+
+        Assert.Equal("Altes Konto/Archiv/2023", folder.FullName);
+        Assert.DoesNotContain(server.Commands, c => c.StartsWith("CREATE", StringComparison.Ordinal));
     }
 }

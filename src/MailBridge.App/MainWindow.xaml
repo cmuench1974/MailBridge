@@ -46,11 +46,6 @@
             </NavigationView.Resources>
 
             <NavigationView.MenuItems>
-                <NavigationViewItem Content="{x:Bind L('nav.accounts')}" Tag="accounts" ToolTipService.ToolTip="{x:Bind L('nav.accounts')}">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE77B;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
                 <NavigationViewItem Content="{x:Bind L('nav.backup')}" Tag="backup" ToolTipService.ToolTip="{x:Bind L('nav.backup')}">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE896;" />
@@ -64,6 +59,11 @@
                 <NavigationViewItem Content="{x:Bind L('nav.schedule')}" Tag="schedule" ToolTipService.ToolTip="{x:Bind L('nav.schedule')}">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE823;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="{x:Bind L('nav.accounts')}" Tag="accounts" ToolTipService.ToolTip="{x:Bind L('nav.accounts')}">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE77B;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>

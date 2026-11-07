@@ -98,31 +98,89 @@ public sealed class ImapConnectionService
             }
         }
 
-        var segments = sourceSeparator == '\0'
-            ? new[] { fullName }
-            : fullName.Split(sourceSeparator, StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length == 0)
-        {
-            throw new ArgumentException($"'{fullName}' does not name a folder.", nameof(fullName));
-        }
+        var segments = SplitPath(fullName, sourceSeparator, nameof(fullName));
 
         // A leading INBOX stays INBOX, whatever the separator; everything else goes below the
         // personal namespace (the top level, or INBOX on servers that keep all folders there).
-        IMailFolder folder = root;
-        var start = 0;
         if (segments.Length > 1 && IsInbox(segments[0]))
         {
-            folder = InboxOf(client);
-            start = 1;
+            return await GetOrCreatePathAsync(InboxOf(client), segments.Skip(1), cancellationToken).ConfigureAwait(false);
         }
 
-        for (var i = start; i < segments.Length; i++)
+        return await GetOrCreatePathAsync(root, segments, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The folder a backed-up folder is restored into when the user picked a target folder and
+    /// keeps the backup's folder structure: <paramref name="relativeName"/> below
+    /// <paramref name="parent"/>, created together with any missing intermediate folders. A
+    /// backed-up INBOX becomes an ordinary subfolder named INBOX there.
+    /// </summary>
+    /// <param name="relativeName">Full folder name as recorded in the backup.</param>
+    /// <param name="separator">Hierarchy separator used in <paramref name="relativeName"/>; null to assume the parent's own.</param>
+    public Task<IMailFolder> GetOrCreateSubfolderAsync(IMailFolder parent, string relativeName, char? separator, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(parent);
+        ArgumentException.ThrowIfNullOrEmpty(relativeName);
+
+        var segments = SplitPath(relativeName, separator ?? parent.DirectorySeparator, nameof(relativeName));
+        return GetOrCreatePathAsync(parent, segments, cancellationToken);
+    }
+
+    private static string[] SplitPath(string name, char separator, string parameterName)
+    {
+        var segments = separator == '\0'
+            ? new[] { name }
+            : name.Split(separator, StringSplitOptions.RemoveEmptyEntries);
+        return segments.Length > 0
+            ? segments
+            : throw new ArgumentException($"'{name}' does not name a folder.", parameterName);
+    }
+
+    /// <summary>
+    /// Subscribes <paramref name="folder"/>. Thunderbird (by default) and most webmail list only
+    /// subscribed folders, and CREATE alone leaves a new folder unsubscribed - so without this a
+    /// restored folder exists on the server but is invisible there. Best effort: a server that
+    /// refuses SUBSCRIBE does not stop a restore.
+    /// </summary>
+    public Task EnsureSubscribedAsync(IMailFolder folder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        return SubscribeAsync(folder, cancellationToken);
+    }
+
+    private static async Task SubscribeAsync(IMailFolder folder, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await folder.SubscribeAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (ImapCommandException)
+        {
+            // NO/BAD from the server: the folder still works, it is just not listed by every client
+        }
+    }
+
+    /// <summary>
+    /// Walks down from <paramref name="folder"/>, reusing existing subfolders and creating (and
+    /// subscribing) missing ones.
+    /// </summary>
+    private static async Task<IMailFolder> GetOrCreatePathAsync(IMailFolder folder, IEnumerable<string> segments, CancellationToken cancellationToken)
+    {
+        foreach (var segment in segments)
         {
             var subfolders = await folder.GetSubfoldersAsync(false, cancellationToken).ConfigureAwait(false);
-            folder = subfolders.FirstOrDefault(f => string.Equals(f.Name, segments[i], StringComparison.Ordinal))
-                     ?? subfolders.FirstOrDefault(f => string.Equals(f.Name, segments[i], StringComparison.OrdinalIgnoreCase))
-                     ?? await folder.CreateAsync(segments[i], isMessageFolder: true, cancellationToken).ConfigureAwait(false)
-                     ?? throw new InvalidOperationException($"The server did not create the folder '{segments[i]}'.");
+            var existing = subfolders.FirstOrDefault(f => string.Equals(f.Name, segment, StringComparison.Ordinal))
+                           ?? subfolders.FirstOrDefault(f => string.Equals(f.Name, segment, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+            {
+                folder = existing;
+                continue;
+            }
+
+            folder = await folder.CreateAsync(segment, isMessageFolder: true, cancellationToken).ConfigureAwait(false)
+                     ?? throw new InvalidOperationException($"The server did not create the folder '{segment}'.");
+            await SubscribeAsync(folder, cancellationToken).ConfigureAwait(false);
         }
 
         return folder;

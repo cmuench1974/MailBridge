@@ -106,7 +106,11 @@ public sealed partial class MainWindow : Window
 
     private void RootNavigationView_Loaded(object sender, RoutedEventArgs e)
     {
-        RootNavigationView.SelectedItem = RootNavigationView.MenuItems[0];
+        // Start on the backup page - unless no account is set up yet, which has to happen first.
+        var startTag = AppState.Accounts.Accounts.Count == 0 ? "accounts" : "backup";
+        RootNavigationView.SelectedItem = RootNavigationView.MenuItems
+            .OfType<NavigationViewItem>()
+            .First(item => (string)item.Tag == startTag);
     }
 
     private void RootNavigationView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)

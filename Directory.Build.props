@@ -6,7 +6,7 @@
 
   <PropertyGroup>
     <!-- Single source of the app version: shown in the title bar and used for the MSI (build.ps1). -->
-    <Version>1.1.1</Version>
+    <Version>1.1.2</Version>
     <Product>MailBridge</Product>
     <Authors>MailBridge</Authors>
     <!-- Application (client) ID of the Microsoft Entra app registration used for Outlook.com /
