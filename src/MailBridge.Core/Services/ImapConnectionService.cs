@@ -12,14 +12,21 @@ namespace MailBridge.Core.Services;
 /// </summary>
 public sealed class ImapConnectionService
 {
+    /// <summary>
+    /// Tests only: connect without TLS to the fake IMAP server on the loopback interface. The
+    /// app never sets it - every real connection uses SSL/TLS or STARTTLS.
+    /// </summary>
+    internal bool UnencryptedForTests { get; init; }
+
     public async Task<ImapClient> ConnectAsync(EmailAccount account, ImapCredential credential, CancellationToken cancellationToken = default)
     {
         var client = new ImapClient();
         try
         {
-            await client.ConnectAsync(account.Host, account.Port,
-                account.UseSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls,
-                cancellationToken).ConfigureAwait(false);
+            var socketOptions = UnencryptedForTests ? SecureSocketOptions.None
+                : account.UseSsl ? SecureSocketOptions.SslOnConnect
+                : SecureSocketOptions.StartTls;
+            await client.ConnectAsync(account.Host, account.Port, socketOptions, cancellationToken).ConfigureAwait(false);
 
             if (credential.IsOAuth2)
             {

@@ -2,6 +2,9 @@ using System.IO.Compression;
 
 namespace MailBridge.Core.Services;
 
+/// <summary>Files packed so far into the archive being written.</summary>
+public sealed record CompressionProgress(int FilesDone, int FilesTotal);
+
 /// <summary>
 /// Packs a folder-based backup into a single .zip archive (or extracts one
 /// back to a working folder before restore). Kept separate from
@@ -10,15 +13,42 @@ namespace MailBridge.Core.Services;
 /// </summary>
 public sealed class CompressionService
 {
-    public void CompressDirectory(string sourceDirectory, string destinationZipPath, IProgress<string>? progress = null)
+    /// <summary>
+    /// Packs every file below <paramref name="sourceDirectory"/> (paths relative to it) into a new
+    /// archive, file by file so <paramref name="progress"/> can follow. Progress is reported at
+    /// most about every 0.5 %, so a backup of many small messages does not flood the UI thread.
+    /// </summary>
+    public void CompressDirectory(string sourceDirectory, string destinationZipPath, IProgress<CompressionProgress>? progress = null)
     {
         if (File.Exists(destinationZipPath))
         {
             File.Delete(destinationZipPath);
         }
 
-        progress?.Report($"Compressing backup into {Path.GetFileName(destinationZipPath)}...");
-        ZipFile.CreateFromDirectory(sourceDirectory, destinationZipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
+        var files = Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories);
+        progress?.Report(new CompressionProgress(0, files.Length));
+
+        try
+        {
+            using var archive = ZipFile.Open(destinationZipPath, ZipArchiveMode.Create);
+            for (var i = 0; i < files.Length; i++)
+            {
+                var entryName = Path.GetRelativePath(sourceDirectory, files[i]).Replace(Path.DirectorySeparatorChar, '/');
+                archive.CreateEntryFromFile(files[i], entryName, CompressionLevel.Optimal);
+
+                var done = i + 1;
+                if (progress is not null && (done == files.Length || done * 200L / files.Length != i * 200L / files.Length))
+                {
+                    progress.Report(new CompressionProgress(done, files.Length));
+                }
+            }
+        }
+        catch
+        {
+            // A half-written archive must not look like a usable backup.
+            File.Delete(destinationZipPath);
+            throw;
+        }
     }
 
     public string ExtractToTempDirectory(string zipPath)

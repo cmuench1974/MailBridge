@@ -7,6 +7,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -20,7 +21,7 @@
         </StackPanel>
 
         <!-- Start -->
-        <Button Grid.Row="1" Style="{StaticResource StartButtonStyle}" Margin="0,4,0,8"
+        <Button Grid.Row="1" Style="{StaticResource StartButtonStyle}" Margin="0,4,0,4"
                 Command="{x:Bind ViewModel.RunBackupCommand}">
             <StackPanel Orientation="Horizontal" Spacing="10">
                 <FontIcon Glyph="&#xE768;" FontSize="16" />
@@ -28,51 +29,66 @@
             </StackPanel>
         </Button>
 
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="12" MaxWidth="760" HorizontalAlignment="Left">
+        <!-- Status and progress: outside the scroll area, so it is always in view -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MaxWidth="760" />
+            </Grid.ColumnDefinitions>
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Padding="16,12,16,12" Spacing="8">
+                    <TextBlock Text="{x:Bind ViewModel.StatusLine, Mode=OneWay}" TextWrapping="Wrap" />
+                    <ProgressBar Maximum="100"
+                                 Value="{x:Bind ViewModel.ProgressValue, Mode=OneWay}"
+                                 IsIndeterminate="{x:Bind ViewModel.IsProgressIndeterminate, Mode=OneWay}"
+                                 Visibility="{x:Bind ToVisibility(ViewModel.IsRunning), Mode=OneWay}" />
+                    <TextBlock Text="{x:Bind ViewModel.ProgressDetail, Mode=OneWay}" Style="{StaticResource HintTextStyle}"
+                               Visibility="{x:Bind TextVisibility(ViewModel.ProgressDetail), Mode=OneWay}" />
+                </StackPanel>
+            </Border>
+        </Grid>
 
-                <!-- Source and destination -->
-                <Border Style="{StaticResource CardBorderStyle}">
-                    <StackPanel Padding="16" Spacing="12">
-                        <TextBlock Text="{x:Bind L('backup.options')}" Style="{StaticResource CardTitleStyle}" />
-                        <ComboBox Header="{x:Bind L('backup.sourceAccount')}" ItemsSource="{x:Bind Accounts}"
-                                  SelectedItem="{x:Bind ViewModel.SelectedAccount, Mode=TwoWay}"
-                                  DisplayMemberPath="DisplayName" MinWidth="320" />
-                        <Grid ColumnSpacing="8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBox Header="{x:Bind L('backup.destination')}" Text="{x:Bind ViewModel.DestinationDirectory, Mode=TwoWay}" />
-                            <Button Grid.Column="1" Content="{x:Bind L('common.browse')}" Click="BrowseButton_Click" VerticalAlignment="Bottom" />
-                        </Grid>
-                        <CheckBox Content="{x:Bind L('common.compress')}" IsChecked="{x:Bind ViewModel.CompressToZip, Mode=TwoWay}" />
-                    </StackPanel>
-                </Border>
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+            <Grid Margin="0,4,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MaxWidth="760" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="12">
 
-                <!-- Selection -->
-                <Border Style="{StaticResource CardBorderStyle}">
-                    <StackPanel Padding="16" Spacing="8">
-                        <TextBlock Text="{x:Bind L('backup.selTitle')}" Style="{StaticResource CardTitleStyle}" />
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <Button Content="{x:Bind L('backup.selChoose')}" Click="SelectFoldersButton_Click" />
-                            <ProgressRing IsActive="{x:Bind ViewModel.IsLoadingFolders, Mode=OneWay}"
-                                          Visibility="{x:Bind ToVisibility(ViewModel.IsLoadingFolders), Mode=OneWay}"
-                                          Width="24" Height="24" VerticalAlignment="Center" />
-                            <TextBlock Text="{x:Bind ViewModel.SelectionSummary, Mode=OneWay}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                    <!-- Source and destination -->
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <StackPanel Padding="16" Spacing="12">
+                            <TextBlock Text="{x:Bind L('backup.options')}" Style="{StaticResource CardTitleStyle}" />
+                            <ComboBox Header="{x:Bind L('backup.sourceAccount')}" ItemsSource="{x:Bind Accounts}"
+                                      SelectedItem="{x:Bind ViewModel.SelectedAccount, Mode=TwoWay}"
+                                      DisplayMemberPath="DisplayName" MinWidth="320" />
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Header="{x:Bind L('backup.destination')}" Text="{x:Bind ViewModel.DestinationDirectory, Mode=TwoWay}" />
+                                <Button Grid.Column="1" Content="{x:Bind L('common.browse')}" Click="BrowseButton_Click" VerticalAlignment="Bottom" />
+                            </Grid>
+                            <CheckBox Content="{x:Bind L('common.compress')}" IsChecked="{x:Bind ViewModel.CompressToZip, Mode=TwoWay}" />
                         </StackPanel>
-                        <TextBlock Text="{x:Bind L('backup.selHint')}" Style="{StaticResource HintTextStyle}" />
-                    </StackPanel>
-                </Border>
+                    </Border>
 
-                <!-- Progress and status -->
-                <Border Style="{StaticResource CardBorderStyle}">
-                    <StackPanel Padding="16" Spacing="12">
-                        <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsRunning, Mode=OneWay}" Visibility="{x:Bind ViewModel.IsRunning, Mode=OneWay}" />
-                        <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" TextWrapping="Wrap" />
-                    </StackPanel>
-                </Border>
-            </StackPanel>
+                    <!-- Selection -->
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <StackPanel Padding="16" Spacing="8">
+                            <TextBlock Text="{x:Bind L('backup.selTitle')}" Style="{StaticResource CardTitleStyle}" />
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Button Content="{x:Bind L('backup.selChoose')}" Click="SelectFoldersButton_Click" />
+                                <ProgressRing IsActive="{x:Bind ViewModel.IsLoadingFolders, Mode=OneWay}"
+                                              Visibility="{x:Bind ToVisibility(ViewModel.IsLoadingFolders), Mode=OneWay}"
+                                              Width="24" Height="24" VerticalAlignment="Center" />
+                                <TextBlock Text="{x:Bind ViewModel.SelectionSummary, Mode=OneWay}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBlock Text="{x:Bind L('backup.selHint')}" Style="{StaticResource HintTextStyle}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
         </ScrollViewer>
     </Grid>
 </Page>

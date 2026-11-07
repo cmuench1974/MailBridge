@@ -50,7 +50,7 @@ public sealed partial class BackupPage : Page
             ViewModel.LoadFolderMessagesAsync,
             () => ViewModel.LoadFoldersCommand.ExecuteAsync(null),
             () => ViewModel.SelectionSummary,
-            () => ViewModel.StatusText);
+            () => ViewModel.StatusLine);
         window.Closed += (_, _) => button.IsEnabled = true;
         window.Activate();
     }
@@ -68,4 +68,7 @@ public sealed partial class BackupPage : Page
 
     private Visibility ToVisibility(bool value) =>
         value ? Visibility.Visible : Visibility.Collapsed;
+
+    private Visibility TextVisibility(string text) =>
+        string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
 }

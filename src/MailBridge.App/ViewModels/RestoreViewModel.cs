@@ -71,11 +71,31 @@ public partial class RestoreViewModel : ObservableObject
     [ObservableProperty]
     private DateTimeOffset? dateTo;
 
+    /// <summary>Null until the first run; the page shows <see cref="StatusLine"/>.</summary>
     [ObservableProperty]
-    private string statusText = Localization.Strings.Get("restore.ready");
+    [NotifyPropertyChangedFor(nameof(StatusLine))]
+    private string? statusText;
+
+    /// <summary>
+    /// "Ready." is resolved on read: this view model is created before the UI language is applied
+    /// at startup, and it outlives the window that is rebuilt when the language changes.
+    /// </summary>
+    public string StatusLine => StatusText ?? Localization.Strings.Get("restore.ready");
 
     [ObservableProperty]
     private bool isRunning;
+
+    /// <summary>0-100 for the progress bar.</summary>
+    [ObservableProperty]
+    private double progressValue;
+
+    /// <summary>True while the amount of work is unknown (extracting, connecting).</summary>
+    [ObservableProperty]
+    private bool isProgressIndeterminate = true;
+
+    /// <summary>Counts below the progress bar; empty when there is nothing to count.</summary>
+    [ObservableProperty]
+    private string progressDetail = string.Empty;
 
     [ObservableProperty]
     private ObservableCollection<SelectableFolder> backupFolders = new();
@@ -336,16 +356,28 @@ public partial class RestoreViewModel : ObservableObject
             return;
         }
 
+        var account = TargetAccount;
+        var backupPath = BackupPath;
+        var uiContext = SynchronizationContext.Current;
+
         IsRunning = true;
-        StatusText = Localization.Strings.Get("restore.preparing");
+        ShowIndeterminate(Localization.Strings.Get("restore.preparing"));
 
         string? extractedTempDir = null;
 
         try
         {
-            var credential = await _credentials.GetAsync(TargetAccount);
-            var workingDir = EnsureWorkingDirectory();
-            extractedTempDir = workingDir != BackupPath ? workingDir : null;
+            var credential = await _credentials.GetAsync(account);
+
+            var isZip = backupPath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
+            if (isZip)
+            {
+                ShowIndeterminate(Localization.Strings.Get("restore.extracting"));
+            }
+
+            // Off the UI thread: extracting a large .zip takes a while.
+            var workingDir = await Task.Run(EnsureWorkingDirectory);
+            extractedTempDir = workingDir != backupPath ? workingDir : null;
 
             var filter = new RestoreFilter
             {
@@ -355,16 +387,15 @@ public partial class RestoreViewModel : ObservableObject
                 DateTo = DateTo,
             };
 
-            StatusText = Localization.Strings.Get("restore.restoring");
-
             var outcome = await _restoreService.RunRestoreAsync(
                 workingDir,
-                TargetAccount,
+                account,
                 credential,
                 filter,
-                conflict => ConflictHandler?.Invoke(conflict) ?? Task.FromResult(ConflictResolution.Skip),
+                conflict => AskOnUiThreadAsync(uiContext, conflict),
                 selection: BuildSelection(),
-                destination: BuildDestination());
+                destination: BuildDestination(),
+                progress: new Progress<RestoreProgress>(ShowRestoreProgress));
 
             StatusText = outcome.Aborted
                 ? Localization.Strings.Get("restore.aborted", outcome.Restored, outcome.Replaced, outcome.Skipped)
@@ -380,12 +411,100 @@ public partial class RestoreViewModel : ObservableObject
         }
         finally
         {
-            if (extractedTempDir is not null && Directory.Exists(extractedTempDir))
-            {
-                Directory.Delete(extractedTempDir, recursive: true);
-            }
-
             IsRunning = false;
+            ProgressDetail = string.Empty;
+
+            if (extractedTempDir is not null)
+            {
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        if (Directory.Exists(extractedTempDir))
+                        {
+                            Directory.Delete(extractedTempDir, recursive: true);
+                        }
+                    }
+                    catch (IOException)
+                    {
+                        // left in %TEMP%; not worth failing the restore for
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                    }
+                });
+            }
         }
+    }
+
+    /// <summary>
+    /// The restore runs on a pool thread after its first await, but the conflict dialog is a
+    /// XAML element and must be created on the UI thread.
+    /// </summary>
+    private Task<ConflictResolution> AskOnUiThreadAsync(SynchronizationContext? uiContext, RestoreConflict conflict)
+    {
+        if (ConflictHandler is not { } handler)
+        {
+            return Task.FromResult(ConflictResolution.Skip);
+        }
+
+        if (uiContext is null || SynchronizationContext.Current == uiContext)
+        {
+            return handler(conflict);
+        }
+
+        var answer = new TaskCompletionSource<ConflictResolution>(TaskCreationOptions.RunContinuationsAsynchronously);
+        uiContext.Post(async _ =>
+        {
+            try
+            {
+                answer.SetResult(await handler(conflict));
+            }
+            catch (Exception ex)
+            {
+                answer.SetException(ex);
+            }
+        }, null);
+        return answer.Task;
+    }
+
+    private void ShowRestoreProgress(RestoreProgress p)
+    {
+        if (!IsRunning)
+        {
+            return; // a late report after the run ended must not overwrite the result
+        }
+
+        var folderLabel = string.IsNullOrEmpty(p.TargetFolder) || p.TargetFolder == p.Folder
+            ? p.Folder
+            : $"{p.Folder} → {p.TargetFolder}";
+
+        StatusText = p.Phase switch
+        {
+            RestorePhase.Connecting => Localization.Strings.Get("restore.connecting"),
+            RestorePhase.CheckingFolder => Localization.Strings.Get("restore.checkingFolder", p.FolderNumber, p.FolderCount, p.TargetFolder),
+            _ => Localization.Strings.Get("progress.folder", p.FolderNumber, p.FolderCount, folderLabel),
+        };
+
+        if (p.MessagesTotal == 0)
+        {
+            IsProgressIndeterminate = true;
+            ProgressDetail = string.Empty;
+            return;
+        }
+
+        // Checking a large target folder takes a while with nothing to count: keep the bar moving.
+        IsProgressIndeterminate = p.Phase != RestorePhase.Restoring;
+        ProgressValue = ProgressFormat.Percent(p.MessagesDone, p.MessagesTotal);
+        ProgressDetail = ProgressFormat.Messages(p.MessagesDone, p.MessagesTotal)
+                         + " · " + Localization.Strings.Get("restore.progressCounts", p.Restored, p.Replaced, p.Skipped);
+    }
+
+    private void ShowIndeterminate(string status)
+    {
+        StatusText = status;
+        IsProgressIndeterminate = true;
+        ProgressValue = 0;
+        ProgressDetail = string.Empty;
     }
 }

@@ -7,6 +7,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -20,7 +21,7 @@
         </StackPanel>
 
         <!-- Start -->
-        <Button Grid.Row="1" Style="{StaticResource StartButtonStyle}" Margin="0,4,0,8"
+        <Button Grid.Row="1" Style="{StaticResource StartButtonStyle}" Margin="0,4,0,4"
                 Command="{x:Bind ViewModel.RunRestoreCommand}">
             <StackPanel Orientation="Horizontal" Spacing="10">
                 <FontIcon Glyph="&#xE768;" FontSize="16" />
@@ -28,88 +29,103 @@
             </StackPanel>
         </Button>
 
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="12" MaxWidth="760" HorizontalAlignment="Left">
+        <!-- Status and progress: outside the scroll area, so it is always in view -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MaxWidth="760" />
+            </Grid.ColumnDefinitions>
+            <Border Style="{StaticResource CardBorderStyle}">
+                <StackPanel Padding="16,12,16,12" Spacing="8">
+                    <TextBlock Text="{x:Bind ViewModel.StatusLine, Mode=OneWay}" TextWrapping="Wrap" />
+                    <ProgressBar Maximum="100"
+                                 Value="{x:Bind ViewModel.ProgressValue, Mode=OneWay}"
+                                 IsIndeterminate="{x:Bind ViewModel.IsProgressIndeterminate, Mode=OneWay}"
+                                 Visibility="{x:Bind ToVisibility(ViewModel.IsRunning), Mode=OneWay}" />
+                    <TextBlock Text="{x:Bind ViewModel.ProgressDetail, Mode=OneWay}" Style="{StaticResource HintTextStyle}"
+                               Visibility="{x:Bind TextVisibility(ViewModel.ProgressDetail), Mode=OneWay}" />
+                </StackPanel>
+            </Border>
+        </Grid>
 
-                <!-- Backup and target -->
-                <Border Style="{StaticResource CardBorderStyle}">
-                    <StackPanel Padding="16" Spacing="12">
-                        <TextBlock Text="{x:Bind L('restore.source')}" Style="{StaticResource CardTitleStyle}" />
-                        <Grid ColumnSpacing="8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBox Header="{x:Bind L('restore.path')}" Text="{x:Bind ViewModel.BackupPath, Mode=TwoWay}" />
-                            <Button Grid.Column="1" Content="{x:Bind L('common.browse')}" Click="BrowseButton_Click" VerticalAlignment="Bottom" />
-                        </Grid>
-                        <ComboBox Header="{x:Bind L('restore.target')}" ItemsSource="{x:Bind Accounts}"
-                                  SelectedItem="{x:Bind ViewModel.TargetAccount, Mode=TwoWay}"
-                                  DisplayMemberPath="DisplayName" MinWidth="320" />
-                        <StackPanel Spacing="8">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <ComboBox Header="{x:Bind L('restore.targetFolder')}" ItemsSource="{x:Bind ViewModel.TargetFolders}"
-                                          SelectedItem="{x:Bind ViewModel.SelectedTargetFolder, Mode=TwoWay}"
-                                          DisplayMemberPath="Name" MinWidth="320" MaxWidth="560" />
-                                <Button VerticalAlignment="Bottom" Command="{x:Bind ViewModel.LoadTargetFoldersCommand}"
-                                        ToolTipService.ToolTip="{x:Bind L('common.reload')}"
-                                        AutomationProperties.Name="{x:Bind L('common.reload')}">
-                                    <FontIcon Glyph="&#xE72C;" FontSize="14" />
-                                </Button>
-                                <ProgressRing IsActive="{x:Bind ViewModel.IsLoadingTargetFolders, Mode=OneWay}"
-                                              Visibility="{x:Bind ToVisibility(ViewModel.IsLoadingTargetFolders), Mode=OneWay}"
-                                              Width="20" Height="20" Margin="0,0,0,6" VerticalAlignment="Bottom" />
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+            <Grid Margin="0,4,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MaxWidth="760" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="12">
+
+                    <!-- Backup and target -->
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <StackPanel Padding="16" Spacing="12">
+                            <TextBlock Text="{x:Bind L('restore.source')}" Style="{StaticResource CardTitleStyle}" />
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Header="{x:Bind L('restore.path')}" Text="{x:Bind ViewModel.BackupPath, Mode=TwoWay}" />
+                                <Button Grid.Column="1" Content="{x:Bind L('common.browse')}" Click="BrowseButton_Click" VerticalAlignment="Bottom" />
+                            </Grid>
+                            <ComboBox Header="{x:Bind L('restore.target')}" ItemsSource="{x:Bind Accounts}"
+                                      SelectedItem="{x:Bind ViewModel.TargetAccount, Mode=TwoWay}"
+                                      DisplayMemberPath="DisplayName" MinWidth="320" />
+                            <StackPanel Spacing="8">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ComboBox Header="{x:Bind L('restore.targetFolder')}" ItemsSource="{x:Bind ViewModel.TargetFolders}"
+                                              SelectedItem="{x:Bind ViewModel.SelectedTargetFolder, Mode=TwoWay}"
+                                              DisplayMemberPath="Name" MinWidth="320" MaxWidth="560" />
+                                    <Button VerticalAlignment="Bottom" Command="{x:Bind ViewModel.LoadTargetFoldersCommand}"
+                                            ToolTipService.ToolTip="{x:Bind L('common.reload')}"
+                                            AutomationProperties.Name="{x:Bind L('common.reload')}">
+                                        <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                                    </Button>
+                                    <ProgressRing IsActive="{x:Bind ViewModel.IsLoadingTargetFolders, Mode=OneWay}"
+                                                  Visibility="{x:Bind ToVisibility(ViewModel.IsLoadingTargetFolders), Mode=OneWay}"
+                                                  Width="20" Height="20" Margin="0,0,0,6" VerticalAlignment="Bottom" />
+                                </StackPanel>
+                                <CheckBox Content="{x:Bind L('restore.keepStructure')}"
+                                          IsChecked="{x:Bind ViewModel.KeepFolderStructure, Mode=TwoWay}"
+                                          IsEnabled="{x:Bind ViewModel.HasTargetFolder, Mode=OneWay}" />
+                                <TextBlock Text="{x:Bind ViewModel.TargetFolderHint, Mode=OneWay}" Style="{StaticResource HintTextStyle}" />
                             </StackPanel>
-                            <CheckBox Content="{x:Bind L('restore.keepStructure')}"
-                                      IsChecked="{x:Bind ViewModel.KeepFolderStructure, Mode=TwoWay}"
-                                      IsEnabled="{x:Bind ViewModel.HasTargetFolder, Mode=OneWay}" />
-                            <TextBlock Text="{x:Bind ViewModel.TargetFolderHint, Mode=OneWay}" Style="{StaticResource HintTextStyle}" />
                         </StackPanel>
-                    </StackPanel>
-                </Border>
+                    </Border>
 
-                <!-- Selection -->
-                <Border Style="{StaticResource CardBorderStyle}">
-                    <StackPanel Padding="16" Spacing="8">
-                        <TextBlock Text="{x:Bind L('restore.selTitle')}" Style="{StaticResource CardTitleStyle}" />
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <Button Content="{x:Bind L('restore.selChoose')}" Click="SelectContentsButton_Click" />
-                            <ProgressRing IsActive="{x:Bind ViewModel.IsLoadingContents, Mode=OneWay}"
-                                          Visibility="{x:Bind ToVisibility(ViewModel.IsLoadingContents), Mode=OneWay}"
-                                          Width="24" Height="24" VerticalAlignment="Center" />
-                            <TextBlock Text="{x:Bind ViewModel.SelectionSummary, Mode=OneWay}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                    <!-- Selection -->
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <StackPanel Padding="16" Spacing="8">
+                            <TextBlock Text="{x:Bind L('restore.selTitle')}" Style="{StaticResource CardTitleStyle}" />
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Button Content="{x:Bind L('restore.selChoose')}" Click="SelectContentsButton_Click" />
+                                <ProgressRing IsActive="{x:Bind ViewModel.IsLoadingContents, Mode=OneWay}"
+                                              Visibility="{x:Bind ToVisibility(ViewModel.IsLoadingContents), Mode=OneWay}"
+                                              Width="24" Height="24" VerticalAlignment="Center" />
+                                <TextBlock Text="{x:Bind ViewModel.SelectionSummary, Mode=OneWay}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBlock Text="{x:Bind L('restore.selHint')}" Style="{StaticResource HintTextStyle}" />
                         </StackPanel>
-                        <TextBlock Text="{x:Bind L('restore.selHint')}" Style="{StaticResource HintTextStyle}" />
-                    </StackPanel>
-                </Border>
+                    </Border>
 
-                <!-- Filters -->
-                <Border Style="{StaticResource CardBorderStyle}">
-                    <StackPanel Padding="16" Spacing="12">
-                        <TextBlock Text="{x:Bind L('restore.filters')}" Style="{StaticResource CardTitleStyle}" />
-                        <Grid ColumnSpacing="16">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBox Header="{x:Bind L('restore.from')}" Text="{x:Bind ViewModel.FromContains, Mode=TwoWay}" />
-                            <TextBox Grid.Column="1" Header="{x:Bind L('restore.subject')}" Text="{x:Bind ViewModel.SubjectContains, Mode=TwoWay}" />
-                        </Grid>
-                        <StackPanel Orientation="Horizontal" Spacing="16">
-                            <CalendarDatePicker Header="{x:Bind L('restore.dateFrom')}" Date="{x:Bind ViewModel.DateFrom, Mode=TwoWay}" />
-                            <CalendarDatePicker Header="{x:Bind L('restore.dateTo')}" Date="{x:Bind ViewModel.DateTo, Mode=TwoWay}" />
+                    <!-- Filters -->
+                    <Border Style="{StaticResource CardBorderStyle}">
+                        <StackPanel Padding="16" Spacing="12">
+                            <TextBlock Text="{x:Bind L('restore.filters')}" Style="{StaticResource CardTitleStyle}" />
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Header="{x:Bind L('restore.from')}" Text="{x:Bind ViewModel.FromContains, Mode=TwoWay}" />
+                                <TextBox Grid.Column="1" Header="{x:Bind L('restore.subject')}" Text="{x:Bind ViewModel.SubjectContains, Mode=TwoWay}" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <CalendarDatePicker Header="{x:Bind L('restore.dateFrom')}" Date="{x:Bind ViewModel.DateFrom, Mode=TwoWay}" />
+                                <CalendarDatePicker Header="{x:Bind L('restore.dateTo')}" Date="{x:Bind ViewModel.DateTo, Mode=TwoWay}" />
+                            </StackPanel>
                         </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- Progress and status -->
-                <Border Style="{StaticResource CardBorderStyle}">
-                    <StackPanel Padding="16" Spacing="12">
-                        <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsRunning, Mode=OneWay}" Visibility="{x:Bind ViewModel.IsRunning, Mode=OneWay}" />
-                        <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" TextWrapping="Wrap" />
-                    </StackPanel>
-                </Border>
-            </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
         </ScrollViewer>
     </Grid>
 </Page>
