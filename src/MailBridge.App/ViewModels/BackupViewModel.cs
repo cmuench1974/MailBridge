@@ -23,11 +23,28 @@ public partial class BackupViewModel : ObservableObject
     [ObservableProperty]
     private bool compressToZip = true;
 
+    /// <summary>Null until the first run; the page shows <see cref="StatusLine"/>.</summary>
     [ObservableProperty]
-    private string statusText = "Ready.";
+    [NotifyPropertyChangedFor(nameof(StatusLine))]
+    private string? statusText;
 
+    /// <summary>
+    /// "Ready." is resolved on read: this view model is created before the UI language is applied
+    /// at startup, and it outlives the window that is rebuilt when the language changes.
+    /// </summary>
+    public string StatusLine => StatusText ?? Localization.Strings.Get("backup.ready");
+
+    /// <summary>0-100 for the progress bar.</summary>
     [ObservableProperty]
     private double progressValue;
+
+    /// <summary>True while the amount of work is unknown (connecting, counting).</summary>
+    [ObservableProperty]
+    private bool isProgressIndeterminate = true;
+
+    /// <summary>"x of y messages (z %)" below the progress bar; empty when there is nothing to count.</summary>
+    [ObservableProperty]
+    private string progressDetail = string.Empty;
 
     [ObservableProperty]
     private bool isRunning;
@@ -229,34 +246,42 @@ public partial class BackupViewModel : ObservableObject
             return;
         }
 
+        // Snapshot: the form stays editable while the backup runs.
+        var account = SelectedAccount;
+        var destination = DestinationDirectory;
+        var compress = CompressToZip;
+        var stagingDir = compress
+            ? Path.Combine(Path.GetTempPath(), "MailBridge", "staging_" + Guid.NewGuid().ToString("N"))
+            : null;
+
         IsRunning = true;
-        StatusText = Localization.Strings.Get("backup.connecting");
-        ProgressValue = 0;
+        ShowIndeterminate(Localization.Strings.Get("backup.connecting"));
 
         try
         {
-            var credential = await _credentials.GetAsync(SelectedAccount);
-            var workDir = CompressToZip
-                ? Path.Combine(Path.GetTempPath(), "MailBridge", "staging_" + Guid.NewGuid().ToString("N"))
-                : DestinationDirectory;
+            var credential = await _credentials.GetAsync(account);
+            var progress = new Progress<BackupProgress>(ShowBackupProgress);
+            var manifest = await _backupService.RunBackupAsync(account, credential, stagingDir ?? destination, progress, selection: BuildSelection());
 
-            var progress = new Progress<BackupProgress>(p =>
+            if (stagingDir is not null)
             {
-                StatusText = $"{p.Folder}: {p.MessagesDone}/{p.MessagesTotal}";
-            });
+                var zipPath = Path.Combine(destination, $"{account.Username}_{DateTime.Now:yyyyMMdd_HHmmss}.zip");
+                ShowIndeterminate(Localization.Strings.Get("backup.compressing", Path.GetFileName(zipPath)));
 
-            var manifest = await _backupService.RunBackupAsync(SelectedAccount, credential, workDir, progress, selection: BuildSelection());
-
-            if (CompressToZip)
-            {
-                var zipPath = Path.Combine(DestinationDirectory, $"{SelectedAccount.Username}_{DateTime.Now:yyyyMMdd_HHmmss}.zip");
-                _compressionService.CompressDirectory(workDir, zipPath);
-                Directory.Delete(workDir, recursive: true);
+                // Off the UI thread: packing a large backup takes minutes.
+                var zipProgress = new Progress<CompressionProgress>(p =>
+                {
+                    if (IsRunning)
+                    {
+                        ShowCount(ProgressFormat.Percent(p.FilesDone, p.FilesTotal), ProgressFormat.Files(p.FilesDone, p.FilesTotal));
+                    }
+                });
+                await Task.Run(() => _compressionService.CompressDirectory(stagingDir, zipPath, zipProgress));
                 StatusText = Localization.Strings.Get("backup.completeZip", manifest.TotalMessages, zipPath);
             }
             else
             {
-                StatusText = Localization.Strings.Get("backup.completeDir", manifest.TotalMessages, DestinationDirectory);
+                StatusText = Localization.Strings.Get("backup.completeDir", manifest.TotalMessages, destination);
             }
         }
         catch (CredentialUnavailableException ex)
@@ -270,6 +295,75 @@ public partial class BackupViewModel : ObservableObject
         finally
         {
             IsRunning = false;
+            ProgressDetail = string.Empty;
+
+            if (stagingDir is not null)
+            {
+                // The downloaded copy is in the .zip now - or the backup failed; either way it goes.
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        if (Directory.Exists(stagingDir))
+                        {
+                            Directory.Delete(stagingDir, recursive: true);
+                        }
+                    }
+                    catch (IOException)
+                    {
+                        // left in %TEMP%; not worth failing the backup for
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                    }
+                });
+            }
         }
+    }
+
+    private void ShowBackupProgress(BackupProgress p)
+    {
+        if (!IsRunning)
+        {
+            return; // a late report after the run ended must not overwrite the result
+        }
+
+        switch (p.Phase)
+        {
+            case BackupPhase.Connecting:
+                ShowIndeterminate(Localization.Strings.Get("backup.connecting"));
+                break;
+            case BackupPhase.Counting:
+                ShowIndeterminate(Localization.Strings.Get("backup.counting"));
+                break;
+            default:
+                StatusText = Localization.Strings.Get("progress.folderMessages", p.FolderNumber, p.FolderCount, p.Folder, p.MessagesDone, p.MessagesTotal);
+                if (p.TotalMessages > 0)
+                {
+                    ShowCount(ProgressFormat.Percent(p.TotalMessagesDone, p.TotalMessages), ProgressFormat.Messages(p.TotalMessagesDone, p.TotalMessages));
+                }
+                else
+                {
+                    IsProgressIndeterminate = true;
+                    ProgressDetail = string.Empty;
+                }
+
+                break;
+        }
+    }
+
+    private void ShowIndeterminate(string status)
+    {
+        StatusText = status;
+        IsProgressIndeterminate = true;
+        ProgressValue = 0;
+        ProgressDetail = string.Empty;
+    }
+
+    private void ShowCount(double percent, string detail)
+    {
+        IsProgressIndeterminate = false;
+        ProgressValue = percent;
+        ProgressDetail = detail;
     }
 }

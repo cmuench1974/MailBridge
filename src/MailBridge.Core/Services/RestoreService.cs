@@ -13,6 +13,47 @@ public sealed class RestoreOutcome
     public bool Aborted { get; set; }
 }
 
+public enum RestorePhase
+{
+    Connecting,
+
+    /// <summary>Existing messages of the target folder are fetched for duplicate detection.</summary>
+    CheckingFolder,
+
+    Restoring,
+}
+
+/// <summary>
+/// Progress of a restore run. The messages to restore are known from the backup's index files
+/// before anything is uploaded, so <see cref="MessagesTotal"/> is exact from the start.
+/// </summary>
+public sealed class RestoreProgress
+{
+    public RestorePhase Phase { get; init; }
+
+    /// <summary>Backed-up folder being restored; empty while connecting.</summary>
+    public string Folder { get; init; } = string.Empty;
+
+    /// <summary>Folder of the target account it goes into; empty while connecting.</summary>
+    public string TargetFolder { get; init; } = string.Empty;
+
+    /// <summary>1-based position of <see cref="Folder"/> among the folders to restore.</summary>
+    public int FolderNumber { get; init; }
+
+    public int FolderCount { get; init; }
+
+    /// <summary>Messages handled so far - restored, replaced or skipped.</summary>
+    public int MessagesDone { get; init; }
+
+    public int MessagesTotal { get; init; }
+
+    public int Restored { get; init; }
+
+    public int Replaced { get; init; }
+
+    public int Skipped { get; init; }
+}
+
 /// <summary>
 /// Context handed to the caller-supplied conflict callback so the UI can
 /// show exactly why something looks like a duplicate/conflict before the
@@ -59,20 +100,15 @@ public sealed class RestoreService
         Func<RestoreConflict, Task<ConflictResolution>> onConflict,
         CancellationToken cancellationToken = default,
         BackupSelection? selection = null,
-        RestoreDestination? destination = null)
+        RestoreDestination? destination = null,
+        IProgress<RestoreProgress>? progress = null)
     {
         var outcome = new RestoreOutcome();
         var manifest = await LoadManifestAsync(backupDirectory, cancellationToken).ConfigureAwait(false);
 
-        using var client = await _imap.ConnectAsync(targetAccount, credential, cancellationToken).ConfigureAwait(false);
-
-        var destinationFolder = destination is null
-            ? null
-            : await _imap.GetOrCreateFolderAsync(client, destination.FolderFullName, destination.Separator, cancellationToken).ConfigureAwait(false);
-
-        ConflictResolution? stickyDecision = null;
-        var subscribed = new HashSet<string>(StringComparer.Ordinal);
-
+        // What to restore comes from the local index files, so the total is exact before the
+        // first upload.
+        var plan = new List<(string Folder, List<EmailRecord> Candidates)>();
         foreach (var folderName in manifest.Folders)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -93,10 +129,43 @@ public sealed class RestoreService
             }
 
             var candidates = index.Where(filter.Matches).ToList();
-            if (candidates.Count == 0)
+            if (candidates.Count > 0)
             {
-                continue;
+                plan.Add((folderName, candidates));
             }
+        }
+
+        var totalMessages = plan.Sum(p => p.Candidates.Count);
+        var messagesDone = 0;
+
+        void Report(RestorePhase phase, int folderIndex = -1, string targetFolderName = "") => progress?.Report(new RestoreProgress
+        {
+            Phase = phase,
+            Folder = folderIndex >= 0 ? plan[folderIndex].Folder : string.Empty,
+            TargetFolder = targetFolderName,
+            FolderNumber = folderIndex + 1,
+            FolderCount = plan.Count,
+            MessagesDone = messagesDone,
+            MessagesTotal = totalMessages,
+            Restored = outcome.Restored,
+            Replaced = outcome.Replaced,
+            Skipped = outcome.Skipped,
+        });
+
+        Report(RestorePhase.Connecting);
+        using var client = await _imap.ConnectAsync(targetAccount, credential, cancellationToken).ConfigureAwait(false);
+
+        var destinationFolder = destination is null
+            ? null
+            : await _imap.GetOrCreateFolderAsync(client, destination.FolderFullName, destination.Separator, cancellationToken).ConfigureAwait(false);
+
+        ConflictResolution? stickyDecision = null;
+        var subscribed = new HashSet<string>(StringComparer.Ordinal);
+
+        for (var folderIndex = 0; folderIndex < plan.Count; folderIndex++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var (folderName, candidates) = plan[folderIndex];
 
             var targetFolder = destinationFolder is null
                 ? await _imap.GetOrCreateFolderAsync(client, folderName, manifest.FolderSeparator, cancellationToken).ConfigureAwait(false)
@@ -111,6 +180,8 @@ public sealed class RestoreService
                 await _imap.EnsureSubscribedAsync(targetFolder, cancellationToken).ConfigureAwait(false);
             }
 
+            // Fetching the envelopes of a large target folder for duplicate detection takes a while.
+            Report(RestorePhase.CheckingFolder, folderIndex, targetFolder.FullName);
             await targetFolder.OpenAsync(FolderAccess.ReadWrite, cancellationToken).ConfigureAwait(false);
 
             var existingSummaries = await targetFolder.FetchAsync(
@@ -131,21 +202,20 @@ public sealed class RestoreService
                 SizeInBytes = s.Size ?? 0,
             }).ToList();
 
+            Report(RestorePhase.Restoring, folderIndex, targetFolder.FullName);
+
             foreach (var candidate in candidates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var check = _duplicateDetector.Compare(candidate, existingRecords);
 
+                var decision = ConflictResolution.Replace;
                 if (check.Kind == DuplicateMatchKind.ConfirmedDuplicate)
                 {
-                    outcome.Skipped++;
-                    continue;
+                    decision = ConflictResolution.Skip;
                 }
-
-                var decision = ConflictResolution.Replace;
-
-                if (check.Kind == DuplicateMatchKind.ConflictingMatch)
+                else if (check.Kind == DuplicateMatchKind.ConflictingMatch)
                 {
                     decision = stickyDecision ?? await onConflict(new RestoreConflict { Candidate = candidate, DuplicateCheck = check }).ConfigureAwait(false);
 
@@ -159,28 +229,33 @@ public sealed class RestoreService
                     {
                         stickyDecision = decision == ConflictResolution.ReplaceAll ? ConflictResolution.Replace : ConflictResolution.Skip;
                     }
-
-                    if (decision is ConflictResolution.SkipAll or ConflictResolution.Skip)
-                    {
-                        outcome.Skipped++;
-                        continue;
-                    }
                 }
 
-                var emlPath = Path.Combine(backupDirectory, candidate.RelativeEmlPath);
-                var message = await MimeMessage.LoadAsync(emlPath, cancellationToken).ConfigureAwait(false);
-
-                if (check.Kind == DuplicateMatchKind.ConflictingMatch && decision is ConflictResolution.Replace && check.ExistingUid.HasValue)
+                if (decision is ConflictResolution.Skip or ConflictResolution.SkipAll)
                 {
-                    await targetFolder.AddFlagsAsync(new UniqueId(check.ExistingUid.Value), MessageFlags.Deleted, true, cancellationToken).ConfigureAwait(false);
-                    await targetFolder.AppendAsync(message, MessageFlags.Seen, cancellationToken).ConfigureAwait(false);
-                    outcome.Replaced++;
+                    outcome.Skipped++;
                 }
                 else
                 {
-                    await targetFolder.AppendAsync(message, MessageFlags.None, cancellationToken).ConfigureAwait(false);
-                    outcome.Restored++;
+                    var emlPath = Path.Combine(backupDirectory, candidate.RelativeEmlPath);
+                    var message = await MimeMessage.LoadAsync(emlPath, cancellationToken).ConfigureAwait(false);
+
+                    // "Replace all" replaces this conflict too, not only the ones after it.
+                    if (check.Kind == DuplicateMatchKind.ConflictingMatch && check.ExistingUid.HasValue)
+                    {
+                        await targetFolder.AddFlagsAsync(new UniqueId(check.ExistingUid.Value), MessageFlags.Deleted, true, cancellationToken).ConfigureAwait(false);
+                        await targetFolder.AppendAsync(message, MessageFlags.Seen, cancellationToken).ConfigureAwait(false);
+                        outcome.Replaced++;
+                    }
+                    else
+                    {
+                        await targetFolder.AppendAsync(message, MessageFlags.None, cancellationToken).ConfigureAwait(false);
+                        outcome.Restored++;
+                    }
                 }
+
+                messagesDone++;
+                Report(RestorePhase.Restoring, folderIndex, targetFolder.FullName);
             }
 
             await targetFolder.ExpungeAsync(cancellationToken).ConfigureAwait(false);
