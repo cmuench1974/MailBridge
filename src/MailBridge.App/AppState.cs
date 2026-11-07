@@ -48,7 +48,7 @@ public static class AppState
 
     public static BackupViewModel Backup { get; } = new(BackupServiceInstance, CompressionServiceInstance, Credentials, SettingsStoreInstance, ImapConnectionService);
 
-    public static RestoreViewModel Restore { get; } = new(new RestoreService(ImapConnectionService), CompressionServiceInstance, Credentials);
+    public static RestoreViewModel Restore { get; } = new(new RestoreService(ImapConnectionService), CompressionServiceInstance, Credentials, ImapConnectionService);
 
     public static SchedulesViewModel Schedules { get; } = new(ScheduleStore, TaskSchedulerService, Accounts.Accounts, SettingsStoreInstance);
 }

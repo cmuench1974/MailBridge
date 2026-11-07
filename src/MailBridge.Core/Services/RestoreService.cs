@@ -35,6 +35,11 @@ public sealed class RestoreConflict
 /// differs in some way is a conflict: the supplied <paramref name="onConflict"/>
 /// callback decides Replace / Replace all / Skip / Skip all / Abort. New
 /// messages with no match are uploaded directly.
+///
+/// Each backed-up folder is restored into the folder of the same name, unless
+/// a <see cref="RestoreDestination"/> names a folder of the target account:
+/// then everything goes directly into that folder, or into the backup's folder
+/// tree recreated below it.
 /// </summary>
 public sealed class RestoreService
 {
@@ -53,14 +58,20 @@ public sealed class RestoreService
         RestoreFilter filter,
         Func<RestoreConflict, Task<ConflictResolution>> onConflict,
         CancellationToken cancellationToken = default,
-        BackupSelection? selection = null)
+        BackupSelection? selection = null,
+        RestoreDestination? destination = null)
     {
         var outcome = new RestoreOutcome();
         var manifest = await LoadManifestAsync(backupDirectory, cancellationToken).ConfigureAwait(false);
 
         using var client = await _imap.ConnectAsync(targetAccount, credential, cancellationToken).ConfigureAwait(false);
 
+        var destinationFolder = destination is null
+            ? null
+            : await _imap.GetOrCreateFolderAsync(client, destination.FolderFullName, destination.Separator, cancellationToken).ConfigureAwait(false);
+
         ConflictResolution? stickyDecision = null;
+        var subscribed = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var folderName in manifest.Folders)
         {
@@ -87,7 +98,19 @@ public sealed class RestoreService
                 continue;
             }
 
-            var targetFolder = await _imap.GetOrCreateFolderAsync(client, folderName, manifest.FolderSeparator, cancellationToken).ConfigureAwait(false);
+            var targetFolder = destinationFolder is null
+                ? await _imap.GetOrCreateFolderAsync(client, folderName, manifest.FolderSeparator, cancellationToken).ConfigureAwait(false)
+                : destination!.KeepFolderStructure
+                    ? await _imap.GetOrCreateSubfolderAsync(destinationFolder, folderName, manifest.FolderSeparator, cancellationToken).ConfigureAwait(false)
+                    : destinationFolder;
+
+            // Restored mail should be visible in every client, also in an existing folder that
+            // was never subscribed (newly created folders are subscribed when they are created).
+            if (subscribed.Add(targetFolder.FullName))
+            {
+                await _imap.EnsureSubscribedAsync(targetFolder, cancellationToken).ConfigureAwait(false);
+            }
+
             await targetFolder.OpenAsync(FolderAccess.ReadWrite, cancellationToken).ConfigureAwait(false);
 
             var existingSummaries = await targetFolder.FetchAsync(

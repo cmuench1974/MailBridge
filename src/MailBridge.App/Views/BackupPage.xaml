@@ -19,12 +19,14 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- Toolbar -->
-        <CommandBar Grid.Row="1" Style="{StaticResource ToolbarStyle}">
-            <AppBarButton Label="{x:Bind L('backup.start')}" Command="{x:Bind ViewModel.RunBackupCommand}">
-                <AppBarButton.Icon><FontIcon Glyph="&#xE768;" /></AppBarButton.Icon>
-            </AppBarButton>
-        </CommandBar>
+        <!-- Start -->
+        <Button Grid.Row="1" Style="{StaticResource StartButtonStyle}" Margin="0,4,0,8"
+                Command="{x:Bind ViewModel.RunBackupCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <FontIcon Glyph="&#xE768;" FontSize="16" />
+                <TextBlock Text="{x:Bind L('backup.start')}" />
+            </StackPanel>
+        </Button>
 
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="12" MaxWidth="760" HorizontalAlignment="Left">

@@ -11,8 +11,9 @@ namespace MailBridge.Core.Tests.Imap;
 internal sealed record FakeFolder(string Name, bool Subscribed = true, bool NoSelect = false);
 
 /// <summary>
-/// Minimal IMAP server on the loopback interface - just enough LOGIN, NAMESPACE, LIST, LSUB
-/// and CREATE for MailKit's folder handling, over a mutable set of mailboxes. INBOX always exists.
+/// Minimal IMAP server on the loopback interface - just enough LOGIN, NAMESPACE, LIST, LSUB,
+/// CREATE and SUBSCRIBE for MailKit's folder handling, over a mutable set of mailboxes. INBOX
+/// always exists. Like real servers, CREATE leaves a new folder unsubscribed.
 /// </summary>
 internal sealed class FakeImapServer : IAsyncDisposable
 {
@@ -42,6 +43,17 @@ internal sealed class FakeImapServer : IAsyncDisposable
             lock (_folders)
             {
                 return _folders.Select(f => f.Name).ToList();
+            }
+        }
+    }
+
+    public IReadOnlyList<string> SubscribedFolderNames
+    {
+        get
+        {
+            lock (_folders)
+            {
+                return _folders.Where(f => f.Subscribed).Select(f => f.Name).ToList();
             }
         }
     }
@@ -129,6 +141,17 @@ internal sealed class FakeImapServer : IAsyncDisposable
                 lock (_folders)
                 {
                     _folders.Add(new FakeFolder(arguments[0].TrimEnd(_separator), Subscribed: false));
+                }
+
+                return Array.Empty<string>();
+            case "SUBSCRIBE":
+                lock (_folders)
+                {
+                    var index = _folders.FindIndex(f => f.Name == arguments[0]);
+                    if (index >= 0)
+                    {
+                        _folders[index] = _folders[index] with { Subscribed = true };
+                    }
                 }
 
                 return Array.Empty<string>();
